@@ -8,16 +8,15 @@ Python wrapper for low-level TCP-IP communication.
 import datetime
 import socket
 from logging import getLogger
+import json
 
-
+#settings = json.load(open("dfosc_setup.json"))
 logger = getLogger(__file__.split("/")[-1])
 
-
-class AscolInputError(Exception):
-    pass
+#print(settings['positions']['grism']['G7']) # returns the number of steps for the grism wheel to move grism 7
 
 
-class DFOSC:
+class controls:
     """
     DFOSC commands for the MOXA
 
@@ -27,8 +26,8 @@ class DFOSC:
 
     INTERNAL_HOST = "192.168.132."  # The remote host, internal IP of the MOXA
     EXTERNAL_HOST = "134.171.81."  # The remote host, external IP of the MOXA
-    PORT =   # TODO: get port number
-    GLOBAL_PASSWORD = ""  # TODO: get password, if there is one
+    PORT = 2003  # TODO: get port number
+    GLOBAL_PASSWORD = "1234"  # TODO: get password, if there is one
 
     def __init__(self, internal=True, dry_run=False):
         if internal:
@@ -38,9 +37,10 @@ class DFOSC:
 
         self.dry_run = dry_run
 
-        self.init_time = datetime.datetime.gmtime()
+        self.init_time = datetime.datetime.now()
 
         logger.info("initialise DFOSC")
+        #print("initialise DFOSC")
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((self.HOST, self.PORT))
@@ -120,7 +120,7 @@ class DFOSC:
 
     def gp(self):
         """
-        Grism Position 'nnnnnn'
+        Grism Position, returns the current position value 'nnnnnn'
         """
         command = f"GP"
         (result_code,) = self.get_data(command)
@@ -132,7 +132,7 @@ class DFOSC:
         n is a number 1-8 or 0-7
         """
         if int(pos) not in range(8):  # range(8) incl. 0, excl, 8
-            msg = f"Grism has positions 0-7; provided: {position}"
+            msg = f"Grism has positions 0-7; provided: {pos}"
             logger.warning(msg)
 
         command = f"G{pos}"
@@ -327,3 +327,20 @@ class DFOSC:
         command = f"Fidfoc"
         (result_code,) = self.get_data(command)
         return result_code
+
+
+# Define some useful commands for grism initialization, simple movement, and position returns
+    
+    def grism_init(self, g: int):
+        """
+        Grism Initialize position, check position, and return the position
+        Here g is the name of the grism e.g. G7
+        """
+        self.gg(g)
+        return 
+
+    
+    def grism_goto(position: str):
+        """
+        Grism Goto position, check position, and return the position
+        """
