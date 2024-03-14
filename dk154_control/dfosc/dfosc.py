@@ -2,95 +2,84 @@
 Python wrapper for low-level TCP-IP communication.
 
 24-11-23
+
+Controls for the aperture/slits, filter, and grism wheels for DFOSC.
+Basic commands defined, and some additional start-up read-state commands for the various wheels.
+
+NOTE: These are not yet tested on ALFOSC, so it is not guaranteed that they work.
 """
 
-
+import time
 import datetime
 import socket
 from logging import getLogger
-import json
 
-#settings = json.load(open("dfosc_setup.json"))
 logger = getLogger(__file__.split("/")[-1])
 
-#print(settings['positions']['grism']['G7']) # returns the number of steps for the grism wheel to move grism 7
+"""
+DFOSC commands for the MOXA
+These are the commands that are sent directly to the MOXA (figure out the IP & port).
+Includes aperture (slit), filter, and grism wheel commands.
+"""
+#TODO - get the IP and port number for the MOXA
+#     - re-write __init__ and get_data ???    
 
+INTERNAL_HOST = ""  # The remote host, internal IP of the MOXA
+EXTERNAL_HOST = ""  # The remote host, external IP of the MOXA
+PORT = 4001  # TODO: get port number
+#GLOBAL_PASSWORD = "1234"  # TODO: get password, if there is one, firewall?
 
-class controls:
+def __init__(self, internal=True, dry_run=False):
+    if internal:
+        self.HOST = self.INTERNAL_HOST
+    else:
+        self.HOST = self.EXTERNAL_HOST
+    self.dry_run = dry_run
+    self.init_time = datetime.datetime.now()
+    logger.info("initialise DFOSC")
+    #print("initialise DFOSC")
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((self.HOST, self.PORT))
+    self.sock = sock  # Don't name it 'socket' else overload module...
+
+def __enter__(self):
+    return self
+
+def __exit__(self, exc_type, exc_value, traceback):
+    self.sock.close()
+    logger.info("DFOSC connection closed in __exit__")
+
+def get_data(self, command: str):
+
     """
-    DFOSC commands for the MOXA
-
-    These are the commands that are sent directly to the MOXA (figure out the IP & port).
-    Includes aperture (slit), filter, and grism wheel commands.
+    The actual sending/recieving of TCP IP commands.
+    returns a LIST (can be one element long)
+    Similar to ASCOL????
     """
+    command_code = command.split()[0]
+    print_command = command
 
-    INTERNAL_HOST = "192.168.132."  # The remote host, internal IP of the MOXA
-    EXTERNAL_HOST = "134.171.81."  # The remote host, external IP of the MOXA
-    PORT = 2003  # TODO: get port number
-    GLOBAL_PASSWORD = "1234"  # TODO: get password, if there is one
+    if self.dry_run:
+        print_command = print_command + " [dry run mode]"
+    logger.info(f"send: {print_command}")
 
-    def __init__(self, internal=True, dry_run=False):
-        if internal:
-            self.HOST = self.INTERNAL_HOST
-        else:
-            self.HOST = self.EXTERNAL_HOST
+    if self.dry_run:
+        return
+    
+    send_command = (command + "\n").encode("utf-8")
+    self.sock.sendall(send_command)  # Send the command to the TCS computer
+    data = self.sock.recv(1024)  # Ask for the result, up to 1024 char long.
+    data = data.decode("ascii")  # Decode from binary string
+    data = data.rstrip()  # Strip some unimportant newlines
+    data = data.split()
 
-        self.dry_run = dry_run
-
-        self.init_time = datetime.datetime.now()
-
-        logger.info("initialise DFOSC")
-        #print("initialise DFOSC")
-
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((self.HOST, self.PORT))
-
-        self.sock = sock  # Don't name it 'socket' else overload module...
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.sock.close()
-        logger.info("DFOSC connection closed in __exit__")
-
-    def get_data(self, command: str):
-        """
-        The actual sending/recieving of TCP IP commands.
-
-        returns a LIST (can be one element long)
-
-        Similar to ASCOL????
-        """
-
-        command_code = command.split()[0]
-        print_command = command
+    if len(data) == 1 and data[0] == "ERR":
+        logger.warning(f"Result is ERR. Is {command_code} a 'set' command?")
 
 
-        if self.dry_run:
-            print_command = print_command + " [dry run mode]"
+    return data
 
-        logger.info(f"send: {print_command}")
-        if self.dry_run:
-            return
-
-        send_command = (command + "\n").encode("utf-8")
-        self.sock.sendall(send_command)  # Send the command to the TCS computer
-
-        data = self.sock.recv(1024)  # Ask for the result, up to 1024 char long.
-        data = data.decode("ascii")  # Decode from binary string
-        data = data.rstrip()  # Strip some unimportant newlines
-        data = data.split()
-
-        if len(data) == 1 and data[0] == "ERR":
-            logger.warning(f"Result is ERR. Is {command_code} a 'set' command?")
-            logger.warning(
-                f"You might have forgotten to send the password: use self.gllg()"
-            )
-
-        return data
-
-# Grism Wheel
+class grism:
 
     def gi(self):
         """
@@ -169,8 +158,22 @@ class controls:
         """
         (return_code,) = self.get_data("Gidfoc")
         return return_code
+    
+    def g_init(self):
+        """
+        Grism wheel initialize
+        """
+        self.gi()
+        time.sleep(2)
+        self.g()
+        if self.g() == 'y':
+            logger.info("Grism Wheel Ready")
+        else:
+            logger.warning("Grism Wheel Not Ready")
 
-# Repeat the same set of commands for the aperture and filter wheels
+        return logger.info(f"Current Grism Position: {self.gp()}")
+
+class slit:
 
     def ai(self):
         """
@@ -248,8 +251,22 @@ class controls:
         command = f"Aidfoc"
         (result_code,) = self.get_data(command)
         return result_code
+    
+    def a_init(self):
+        """
+        Aperture initialize
+        """
+        self.ai()
+        time.sleep(2)
+        self.a()
+        if self.a() == 'y':
+            logger.info("Aperture Wheel Ready")
+        else:
+            logger.warning("Aperture Wheel Not Ready")
 
-# Filter Wheel
+        return print(f"Current Aperture Position: {self.ap()}")
+
+class filter:
 
     def fi(self):
         """
@@ -328,19 +345,19 @@ class controls:
         (result_code,) = self.get_data(command)
         return result_code
 
+    def f_init(self):
+        """
+        Filter wheel initialize
+        """
+        self.fi()
 
-# Define some useful commands for grism initialization, simple movement, and position returns
-    
-    def grism_init(self, g: int):
-        """
-        Grism Initialize position, check position, and return the position
-        Here g is the name of the grism e.g. G7
-        """
-        self.gg(g)
-        return 
+        time.sleep(2)
+        
+        self.f()
 
-    
-    def grism_goto(position: str):
-        """
-        Grism Goto position, check position, and return the position
-        """
+        if self.f() == 'y':
+            logger.info("Filter Wheel Ready")
+        else:
+            logger.warning("Filter Wheel Not Ready")
+
+        return print(f"Current Filter Position: {self.fp()}")
