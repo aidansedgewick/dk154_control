@@ -24,22 +24,6 @@ from dk154_control.tcs.ascol import Ascol
 #this operation must be done before using this code
 
 ###############################
-#When you are connected to VPN, you can ssh to the DFOSC machine using
-#ssh dk154@134.171.81.78 <- DFOSC Linux PC
-#Password is dk154
-
-#Then, connect to the computer to be use for tests
-#ssh guest@192.168.132.110
-#password: 2Mindthe*
-
-#connect to linux PC 1 locally:
-#ssh dk154@192.168.132.52
-#pwd: dk154
-
-#I don't know if you can run the DFOSC via the command line, if not, you need to use remote desktop. There is instructions for this and how to use the TCS remotely on
-#Skottfelt.dk/dk154.
-
-###############################
 #initialize DFOSC wheels (only at startup/power cycle) 
 
 cprint('\n**** Initializing DFOSC wheels, and Reading Telescope State ****', 'red', attrs=['blink'])
@@ -80,7 +64,7 @@ mag = data_dict['mag']
 
 for i in range(len(target_name)):
     EXP_TIME = nte_exp_time_calc(mag[i], slit, grism)
-    EXP_TIME.append(data_dict['exp'])
+    EXP_TIME.append(data_dict)
 
 
 ###############################
