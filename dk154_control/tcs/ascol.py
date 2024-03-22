@@ -42,12 +42,14 @@ class Ascol:
 
         self.dry_run = dry_run
 
-        self.init_time = datetime.datetime.gmtime()
+        self.init_time = datetime.datetime.now()
 
         logger.info("initialise Ascol")
-
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((self.HOST, self.PORT))
+        if not self.dry_run:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((self.HOST, self.PORT))
+        else:
+            sock = None
 
         self.sock = sock  # Don't name it 'socket' else overload module...
 
@@ -323,7 +325,7 @@ class Ascol:
         """
         self.gllg()  # Set commands require global password
         command = f"WAGP"
-        (return_code,) = self.get_data("WAGP")
+        (return_code,) = self.get_data(command)
         return return_code
 
     def warp(self):

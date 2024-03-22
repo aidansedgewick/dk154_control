@@ -3,7 +3,7 @@ import logging
 import sys
 from pathlib import Path
 
-import dk154_control.tcs
+import dk154_control.tcs 
 
 root_dir = Path(__file__).parent.parent
 
