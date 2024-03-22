@@ -6,7 +6,6 @@ Based on ASCOL protocol.
 24-11-23
 """
 
-
 import datetime
 import socket
 from logging import getLogger
