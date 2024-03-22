@@ -24,12 +24,9 @@ These are the commands that are sent directly to the MOXA (figure out the IP & p
 Includes aperture (slit), filter, and grism wheel commands.
 """
 #TODO - get the IP and port number for the MOXA
-#     - re-write __init__ and get_data ???    
 
 INTERNAL_HOST = ""  # The remote host, internal IP of the MOXA
-#EXTERNAL_HOST = ""  # The remote host, external IP of the MOXA
 PORT = 4001  # TODO: get port number
-#GLOBAL_PASSWORD = "1234"  # TODO: get password, if there is one, firewall?
 
 def __init__(self, internal=True, dry_run=False):
     
