@@ -12,6 +12,7 @@ import sys
 import os
 import subprocess
 import pandas as pd
+import json
 
 from termcolor import colored, cprint
 
@@ -29,11 +30,11 @@ from dk154_control.tcs.ascol import Ascol
 cprint('\n**** Initializing DFOSC wheels, and Reading Telescope State ****', 'red', attrs=['blink'])
 time.sleep(2)
 
-tcs = Ascol(dry_run=True)
+tcs = Ascol()
 
-slit = dfosc.Slit(dry_run=True)
-grism = dfosc.Grism(dry_run=True)
-filter = dfosc.Filter(dry_run=True)
+slit = dfosc.Slit()
+grism = dfosc.Grism()
+filter = dfosc.Filter()
 
 slit.a_init()
 grism.g_init()
@@ -60,11 +61,21 @@ RA = data_dict['ra']
 DEC = data_dict['dec']
 mag = data_dict['mag']
 
+# Read dfosc setup
+dfosc_wheels = json.load(open('dfosc/dfosc_setup.json'))
+grism = dfosc_wheels['grism']
+slit = dfosc_wheels['slit']
+filt = dfosc_wheels['filter']
+
+
+"""
 #TODO use magnitudes (that should be included in ranked_list) to calculate exposure time using NTE exp time calculator.
 
 for i in range(len(target_name)):
     EXP_TIME = nte_exp_time_calc(mag[i], slit, grism)
-    EXP_TIME.append(data_dict)
+    EXP_TIME.append(data_dict['expt'])   #does this create a new column?
+
+expotime = data_dict['expt']
 
 
 ###############################
@@ -80,11 +91,10 @@ tel_dict = pd.read_csv(filename)
 mode = tel_dict['mode']
 aperture = tel_dict['aperture']
 ADC = tel_dict['ADC']
-slit = tel_dict['slit']
+#slit = tel_dict['slit']
 slit_pa = tel_dict['PA']
-grism = tel_dict['grism']
-filt = tel_dict['filter']
-expotime = tel_dict['exposure']
+#grism = tel_dict['grism']
+#filt = tel_dict['filter']
 acquitime = tel_dict['acquisition']
 numexpose = tel_dict['numexpose']
 #maxseeing  = obdict['maxseeing']
@@ -105,6 +115,7 @@ for i in range(len(target_name)):
         target_obs = target_name[i]
         cprint('\n**** Observing target no. {:d} ****'.format(i+1), 'red', attrs=['blink'])
         time.sleep(1)
+
         # Point to a target
         cprint('\n**** Pointing target no. {:d} ****'.format(i+1), 'red', attrs=['blink'])
         time.sleep(5)
@@ -114,18 +125,22 @@ for i in range(len(target_name)):
         # tcs.focus(RA, DEC)
         # Start preparation movements of the instrument
         
-        slit.goto() # define the slit position
-        filter.goto() # define the filter
-        grism.goto() # define the grism
+        grism.goto(grism['G3']) # define the grism
+        slit.goto(slit['1.0']) # define the slit position
+        filter.goto(filt['Empty']) # define the filter
 
         # Image Acquisition and display
         # Point to a target
         cprint('\n**** Acquisition target no. {:d} ****'.format(i+1), 'red', attrs=['blink'])
         time.sleep(5)
+
+        # Take first positioning image?
+
         os.system('dfosc.target target_name ;'
                   'dfosc.mode mode ;'
                   'dfosc.aperture aperture ;'
                   'dfosc.filter filter ')
+        
         tip ='yes'
         while tip == 'yes':
             os.system('dfosc.slit 0 ;'
@@ -197,3 +212,5 @@ for i in range(len(target_name)):
         target_observed.append(target_name[i])
     else:
         continue
+
+"""
