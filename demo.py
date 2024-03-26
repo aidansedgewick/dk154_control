@@ -62,7 +62,7 @@ DEC = data_dict['dec']
 mag = data_dict['mag']
 
 # Read dfosc setup
-dfosc_wheels = json.load(open('dfosc/dfosc_setup.json'))
+dfosc_wheels = json.load(open('dk154_control/dfosc/dfosc_setup.json'))
 grism = dfosc_wheels['grism']
 slit = dfosc_wheels['slit']
 filt = dfosc_wheels['filter']
