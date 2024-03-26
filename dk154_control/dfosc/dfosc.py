@@ -217,14 +217,14 @@ class Grism:
         """
         Grism wheel initialize
         """
-        wheel_init = self.gi()
-        time.sleep(2)
+        self.gi()
+        time.sleep(5)
         wheel_rdy = self.g()
         if wheel_rdy == 'y':
             logger.info("Grism Wheel Ready")
         else:
             logger.warning("Grism Wheel Not Ready")
-            time.sleep(5)
+            time.sleep(2)
 
         return logger.info(f"Current Grism Position: {self.gp()}")
     
@@ -379,10 +379,11 @@ class Slit:
         """
         Aperture initialize
         """
-        wheel_init = self.ai()
+        self.ai()
+        
         time.sleep(5)
-        self.a()
-        while wheel_init != 'y':
+        wheel_rdy = self.a()
+        while wheel_rdy != 'y':
             logger.warning("Aperture Wheel Not Ready")
             time.sleep(2)
             self.a()
