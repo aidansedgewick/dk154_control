@@ -220,11 +220,10 @@ class Grism:
         self.gi()
         time.sleep(5)
         wheel_rdy = self.g()
-        if wheel_rdy == 'y':
-            logger.info("Grism Wheel Ready")
-        else:
+        while wheel_rdy != 'y':
             logger.warning("Grism Wheel Not Ready")
             time.sleep(2)
+            self.g()
 
         return logger.info(f"Current Grism Position: {self.gp()}")
     
