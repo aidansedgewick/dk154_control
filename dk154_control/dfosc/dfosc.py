@@ -26,12 +26,11 @@ Includes aperture (slit), filter, and grism wheel commands.
 #TODO - get the IP and port number for the MOXA
 
 INTERNAL_HOST = ""  # The remote host, internal IP of the MOXA
-PORT = 4001  # TODO: get port number
+PORT = 1  # TODO: get port number
 
 def __init__(self, internal=True, dry_run=False):
     
     self.HOST = INTERNAL_HOST
-    self.dry_run = dry_run
     self.init_time = datetime.datetime.now()
     logger.info("initialise DFOSC")
     #print("initialise DFOSC")
@@ -87,7 +86,6 @@ class Grism:
     def __init__(self, internal=True, dry_run=False):
 
         self.HOST = INTERNAL_HOST
-        self.dry_run = dry_run
         self.init_time = datetime.datetime.now()
         logger.info("initialise DFOSC")
         #print("initialise DFOSC")
@@ -123,7 +121,9 @@ class Grism:
             return
 
         send_command = (command + "\n").encode("utf-8")
+        #TODO there may be a timeout issue here, so would need a try block to reconnect
         self.sock.sendall(send_command)  # Send the command to the TCS computer
+
         data = self.sock.recv(1024)  # Ask for the result, up to 1024 char long.
         data = data.decode("ascii")  # Decode from binary string
         data = data.rstrip()  # Strip some unimportant newlines
@@ -235,10 +235,8 @@ class Grism:
         if wheel_ready == 'y':
             logger.info("Grism Wheel Moving to Position")
             self.gg(position)
-            time.sleep(5)
         else:
             logger.warning("Grism Wheel Not Ready")
-            time.sleep(2)
 
         return print(f"Current Grism Position: {self.gp()}")
 
@@ -248,7 +246,6 @@ class Slit:
     def __init__(self, internal=True, dry_run=False):
         
         self.HOST = INTERNAL_HOST
-        self.dry_run = dry_run
         self.init_time = datetime.datetime.now()
         logger.info("initialise DFOSC")
         #print("initialise DFOSC")
@@ -397,10 +394,8 @@ class Slit:
         if self.a() == 'y':
             logger.info("Aperture Wheel Moving to Position")
             self.ag(position)
-            time.sleep(5)
         else:
             logger.warning("Aperture Wheel Not Ready")
-            time.sleep(2)
 
         return print(f"Current Aperture Position: {self.ap()}")
 
@@ -409,7 +404,6 @@ class Filter:
     def __init__(self, internal=True, dry_run=False):
         
         self.HOST = INTERNAL_HOST
-        self.dry_run = dry_run
         self.init_time = datetime.datetime.now()
         logger.info("initialise Filter wheel")
         #print("initialise DFOSC")
@@ -560,9 +554,7 @@ class Filter:
         if self.f() == 'y':
             logger.info("Filter Wheel Moving to Position")
             self.fg(position)
-            time.sleep(5)
         else:
             logger.warning("Filter Wheel Not Ready")
-            time.sleep(2)
 
         return print(f"Current Filter Position: {self.fp()}")
