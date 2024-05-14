@@ -26,7 +26,7 @@ Includes aperture (slit), filter, and grism wheel commands.
 #TODO - get the IP and port number for the MOXA
 
 INTERNAL_HOST = ""  # The remote host, internal IP of the MOXA
-PORT = 1  # TODO: get port number
+PORT = 4001  # TODO: get port number
 
 def __init__(self, internal=True, dry_run=False):
     
