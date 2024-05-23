@@ -69,7 +69,7 @@ TERS_CODES = {
     "07": "sky slew",
     "08": "mechanical flip",
     "09": "sky flip",
-    "10": "parking",
+    "10": "parking",  # typo in docs? one should be parked?
     "11": "parking",
     "12": "initializing",
 }
