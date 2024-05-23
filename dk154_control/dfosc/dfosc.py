@@ -87,7 +87,7 @@ class Grism:
 
         self.HOST = INTERNAL_HOST
         self.init_time = datetime.datetime.now()
-        logger.info("initialise DFOSC")
+        logger.info("initialise DFOSC grism wheel")
         #print("initialise DFOSC")
         if not self.dry_run:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -247,7 +247,7 @@ class Slit:
         
         self.HOST = INTERNAL_HOST
         self.init_time = datetime.datetime.now()
-        logger.info("initialise DFOSC")
+        logger.info("initialise DFOSC slit wheel")
         #print("initialise DFOSC")
         if not self.dry_run:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -405,7 +405,7 @@ class Filter:
         
         self.HOST = INTERNAL_HOST
         self.init_time = datetime.datetime.now()
-        logger.info("initialise Filter wheel")
+        logger.info("initialise DFOSC filter wheel")
         #print("initialise DFOSC")
         if not self.dry_run:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
