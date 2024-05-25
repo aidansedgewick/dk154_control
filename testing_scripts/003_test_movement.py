@@ -23,6 +23,8 @@ if __name__ == "__main__":
     test_mode = args.test_mode  # False by default
     debug = args.debug  # False by default
 
+    logger.info("start script")
+
     with Ascol(test_mode=test_mode, debug=debug) as ascol:
         print("\n\n\n")
 

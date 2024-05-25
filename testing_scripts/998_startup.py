@@ -13,10 +13,17 @@ if __name__ == "__main__":
     debug = args.debug  # False by default
 
     with Ascol(test_mode=test_mode, debug=debug) as ascol:
+        input(f"Telescope ON - press enter: ")
         teon_result = ascol.teon("1")
+        input(f"Telescope INIT - press enter: ")
         tein_result = ascol.tein()
+        input(f"Dome INIT - press enter: ")
         doin_result = ascol.doin()
+        input(f"Dome SLIT OPEN - press enter: ")
         doso_result = ascol.doso("1")
+        input(f"Mirror flap OPEN - press enter: ")
         fmop_result = ascol.fmop("1")
+        input(f"Cassegran flap OPEN - press enter: ")
         fcop_result = ascol.fcop("1")
+        input(f"Dome AUTOMATED - press enter: ")
         doam_result = ascol.doam()

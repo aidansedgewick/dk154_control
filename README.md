@@ -88,6 +88,54 @@ print("CCD state after exposure: {ccd_state}")
 
 ```
 
+### Running test scripts
+
+There are a handful of test scripts in test scripts.
+
+run eg. `python3 test_scripts/001_test_imports.py`.
+You can also run with a debug mode which prints the 'raw' response from ASCOL/CC3.
+eg. `python3 test_scripts/002_test_imports.py --debug`.
+
+
+001_test_import.py
+    tests that the Ascol() and Ccd() classes import and init properly.
+
+002_test_status_commands.py
+    tests a number of commands which read the status of the telescope, FASU wheels.
+
+003_test_movement.py
+    test moving the telescope. Read it's current position, nudge it by a degree and go.
+    CHECK THE DESTINATION COORD IS SENSIBLE - if not, kill the script and
+    hard code the destination in the script for now...
+
+004_test_FASU.py
+    test reading state/pos,  and movement of FASU filter wheels.
+
+005_test_CCD3.py
+    test exposing the camera.
+
+    NOTE1: CCD3 also has "WASB.filter"/"WASA.filter" option
+    Unsure if this is just for storing a string in FITS header of output, or actually
+    changing the wheel position. Don't know which is the more likely.
+    This script prints all.
+
+    NOTE2: ASCOL has command "open shutter". Is this shutter separate to CCD3 shutter?!
+    If so - uncomment OPEN SHUTTER and CLOSE SHUTTER lines in this script...
+
+006_test_meteo.py
+    test meteorology instrument commands.
+
+101_status_loop.py
+    loop every 'n' seconds, log results from a set of status commands.
+
+
+998_startup.py
+    *guide only* - unsure exactly what commands are needed to fully initialise telescope.
+    
+999_shutdown.py
+    *guide only* - unsure exactly what commands are needed to fully/safely shutdown telescope.
+
+
 ### Mock telescope interactions
 
 There is a separate repo, `dk154_mock` (*still in early dev!*) which can be used 

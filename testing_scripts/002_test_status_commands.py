@@ -18,7 +18,29 @@ if __name__ == "__main__":
     test_mode = args.test_mode
     debug = args.debug
 
+    logger.info("start script")
+
     with Ascol(test_mode=test_mode, debug=debug) as ascol:
+
+        input("test \033[032;1mread UTC (GLUT)\033[0m - press enter: ")
+        logger.info("test GLUT")
+        try:
+            mjd, time_str = ascol.glut()
+            logger.info(f"MJD/time: {mjd} & {time_str}")
+        except Exception as e:
+            print(e)
+            logger.error("GLRE failed")
+        print("\n\n\n")
+
+        input("test \033[032;1mread sidereal (GLSD)\033[0m - press enter: ")
+        logger.info("test read GLSD")
+        try:
+            time_str = ascol.glsd()
+            logger.info(f"sideral time {time_str}")
+        except Exception as e:
+            print(e)
+            logger.error("GLRE failed")
+        print("\n\n\n")
 
         input("test \033[032;1mremote state (GLRE)\033[0m - press enter: ")
         logger.info("test GLRE")
@@ -97,7 +119,84 @@ if __name__ == "__main__":
             logger.error("FMRS failed")
         print("\n\n\n")
 
-        input("test convenience \033[032;1mlog all status\033[0m - press enter: ")
+        input("test \033[032;1mread shutter pos (SHRP)\033[0m - press enter: ")
+        logger.info("test SHRP")
+        try:
+            shutter_pos = ascol.shrp()
+            logger.info(f"shutter pos: {shutter_pos}")
+        except Exception as e:
+            print(e)
+            logger.info("traceback:\n" + traceback.format_exc())
+            logger.error("SHRP failed")
+        print("\n\n\n")
+
+        input("test \033[032;1mFOcus Read Absolute pos (FORA)\033[0m - press enter: ")
+        logger.info("test FORA")
+        try:
+            focus_pos = ascol.fora()
+            logger.info(f"focus pos: {focus_pos}")
+        except Exception as e:
+            print(e)
+            logger.info("traceback:\n" + traceback.format_exc())
+            logger.error("FORA failed")
+        print("\n\n\n")
+
+        input("test \033[032;1mFOcus Read State (FORS)\033[0m - press enter: ")
+        logger.info("test FORA")
+        try:
+            focus_state = ascol.fors()
+            logger.info(f"focus state: {focus_state}")
+        except Exception as e:
+            print(e)
+            logger.info("traceback:\n" + traceback.format_exc())
+            logger.error("FORA failed")
+        print("\n\n\n")
+
+        input("test \033[32;1mWheel A Read State (WARS)\033[0m - press enter: ")
+        logger.info("test WARS")
+        try:
+            wheel_a_status = ascol.wars()
+            logger.info(f"wheel a status: {wheel_a_status}")
+        except Exception as e:
+            logger.info(e)
+            logger.info("traceback:\n" + traceback.format_exc())
+            logger.info("WARS failed")
+        print("\n\n\n")
+
+        input("test \033[32;1mWheel A Read Position (WARP)\033[0m - press enter: ")
+        logger.info("test WARP")
+        try:
+            wheel_a_pos = ascol.warp()
+            logger.info(f"wheel a pos: {wheel_a_pos}")
+        except Exception as e:
+            logger.info(e)
+            logger.info("traceback:\n" + traceback.format_exc())
+            logger.info("WARP failed")
+        print("\n\n\n")
+
+        input("test \033[32;1mWheel B Read State (WBRS)\033[0m - press enter: ")
+        logger.info("test WBRS")
+        try:
+            wheel_b_status = ascol.wbrs()
+            logger.info(f"wheel b status: {wheel_b_status}")
+        except Exception as e:
+            logger.info(e)
+            logger.info("traceback:\n" + traceback.format_exc())
+            logger.info("WBRS failed")
+        print("\n\n\n")
+
+        input("test \033[32;1mWheel B Read Position (WBRP)\033[0m - press enter: ")
+        logger.info("test WBRP")
+        try:
+            wheel_b_pos = ascol.wbrp()
+            logger.info(f"wheel b pos: {wheel_b_pos}")
+        except Exception as e:
+            logger.info(e)
+            logger.info("traceback:\n" + traceback.format_exc())
+            logger.info("WBRP failed")
+        print("\n\n\n")
+
+        input("test convenience \033[032;1mlog_all_status()\033[0m - press enter: ")
         logger.info("test 'log_all_status'")
         try:
             ascol.log_all_status()

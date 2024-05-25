@@ -59,7 +59,7 @@ class Ascol:
             self.PORT = self.LOCAL_PORT
             logger.info(f"starting in TEST MODE (use localhost:{self.PORT})")
 
-        self.debug = debug
+        self.debug = debug  # TODO: change debug mode so that the LOGGER is changed!
 
         self.init_time = datetime.datetime.now()
         self.delay = delay
@@ -97,6 +97,8 @@ class Ascol:
 
         send_command = (command + "\n").encode("utf-8")
 
+        time.sleep(0.1)  # Sensible to wait a little?
+
         try:
             self.sock.sendall(send_command)  # Send the command to the TCS computer
             if self.debug:
@@ -132,7 +134,7 @@ class Ascol:
         """
         Run a command repeatedly (with delay) until the expected result is returned.
 
-        # This function is an experiment!
+        # This function is experimental!
 
         Parameters
         ----------
@@ -237,7 +239,7 @@ class Ascol:
         ----------
         on_off [1 - on, 0 - off]
 
-        Returns 1 (ok) or ERR
+        Returns "1" (ok) or ERR
         """
 
         on_off = str(on_off)
@@ -253,9 +255,8 @@ class Ascol:
         """
         TElescope STop [ASCOL 2.11]
 
-        Returns 1 (ok)
+        Returns "1" (ok) or ERR
         """
-
         self.gllg()
         return self.get_data("TEST")
 
@@ -263,18 +264,17 @@ class Ascol:
         """
         TElescope FLip [ASCOL 2.13]
 
-        Returns 1 (ok)
+        Returns "1" (ok) or ERR
         """
-
+        self.gllg()
         return self.get_data("TEFL")
 
     def tepa(self):
         """
         Telescope PArk [ASCOL 2.14]
 
-        Returns 1 (ok)
+        Returns "1" (ok) or ERR
         """
-
         self.gllg()  # Set commands require global password
         return self.get_data("TEPA")
 
@@ -282,8 +282,10 @@ class Ascol:
         """
         TElescope INitialization [ASCOL 2.15]
 
-
+        Returns "1" (ok) or ERR
         """
+        self.gllg()
+        return self.get_data("TEIN")
 
     def tsra(self, ra: str, dec: str, position: str):
         """
@@ -295,7 +297,7 @@ class Ascol:
         dec [str: ddmmss.s]
         position [str: 0 - east, 1 - west]
 
-        Returns 1 (ok) or ERR
+        Returns "1" (ok) or ERR
         """
         self.gllg()  # Set commands require global password
         command = f"TSRA {ra} {dec} {position}"
@@ -362,6 +364,7 @@ class Ascol:
 
         Returns "1" (ok) or ERR
         """
+        self.gllg()
         result_code, *dummy_values = self.get_data("DOAM")
         return result_code
 
@@ -371,6 +374,7 @@ class Ascol:
 
         Returns "1" (ok) or ERR
         """
+        self.gllg()
         result_code, *dummy_values = self.get_data("DOPA")
         return result_code
 
@@ -380,6 +384,7 @@ class Ascol:
 
         Returns "1" (ok) or ERR
         """
+        self.gllg()
         result_code, *dummy_values = self.get_data("DOIN")
         return result_code
 
@@ -387,8 +392,13 @@ class Ascol:
         """
         DOme Slit Open/close [ASCOL 2.50]
 
+        Parameters
+        ----------
+        open_close [1 - open, 0 - close]
+
         Returns "1" (ok) or ERR
         """
+        self.gllg()
         command = f"DOSO {open_close}"
         result_code, *dummy_values = self.get_data(command)
         return result_code
@@ -399,6 +409,7 @@ class Ascol:
 
         Returns 1 (ok) or ERR
         """
+        self.gllg()
         result_code, *dummy_values = self.get_data("DOST")
         return result_code
 
@@ -414,6 +425,10 @@ class Ascol:
     def fcop(self, open_close: str):
         """
         Flap Cassegrain OPen/close [ASCOL 2.57]
+
+        Parameters
+        ----------
+        open_close [1 - open, 0 - close]
 
         Returns 1 (ok) or ERR
         """
@@ -558,6 +573,25 @@ class Ascol:
         result_code, *dummy_values = self.get_data("WBRS")
         return ascol_constants.WBRS_CODES[result_code]
 
+    def fora(self):
+        """
+        FOcus Read Absolute position [ASCOL 2.82]
+
+        Returns focus_pos [float: mm]
+        """
+
+        focus_pos, *dummy_values = self.get_data("FORA")
+        return float(focus_pos)
+
+    def fors(self):
+        """
+        FOcus Read State [ASCOL 2.87]
+
+        Returns human-readable string
+        """
+        result_code, *dummy_values = self.get_data("FORS")
+        return ascol_constants.FORS_CODES[result_code]
+
     def shop(self, open_close):
         """
         SHutter OPen/close [ASCOL 2.134]
@@ -572,6 +606,9 @@ class Ascol:
         if open_close not in ["1", "0"]:
             errstr = "shop: use input '1' for open, '0' for close"
             raise AscolInputError(errstr)
+        command = f"SHOP {open_close}"
+        result_code, *dummy_values = self.get_data(command)
+        return result_code
 
     def shrp(self):
         """
@@ -771,22 +808,25 @@ class Ascol:
         safety_relay_state = self.glsr()
         telescope_state = self.ters()
         dome_state = self.dors()
+        dome_slit_state = self.doss()
         flap_cassegrain_state = self.fcrs()
         flap_mirror_state = self.fmrs()
         curr_ra, curr_dec, curr_pos = self.trrd()
+        shutter_pos = self.shrp()
         wheel_a_position = self.warp()
         wheel_b_position = self.wbrp()
 
         status_str = (
             f"Telescope status:\n"
-            f"    RA/Dec (pos) [TRRD]: {curr_ra}, {curr_dec} ({curr_pos})\n"
             f"    remote/local [GLRE]: {remote_state}\n"
             f"    safety relay [GLSR]: {safety_relay_state}\n"
             f"    tel. state [TERS]  : {telescope_state}\n"
             f"    dome state [DORS]  : {dome_state}\n"
+            f"    domeslit ste [DOSS]: {dome_slit_state}\n"
             f"    casseg. flap [FCRS]: {flap_cassegrain_state}\n"
             f"    mirror flap [FMRS] : {flap_mirror_state}\n"
             f"    RA/Dec (pos) [TRRD]: {curr_ra}, {curr_dec} ({curr_pos})\n"
+            f"    shutter pos [SHRP] : {shutter_pos}\n"
             f"    wheel A pos. [WARP]: {wheel_a_position}\n"
             f"    wheel B pos. [WBRP]: {wheel_b_position}\n"
         )
