@@ -4,7 +4,6 @@ import sys
 from pathlib import Path
 from logging import handlers
 
-# import dk154_control.tcs
 
 root_dir = Path(__file__).parent.parent
 

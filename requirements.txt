@@ -1,5 +1,7 @@
 numpy
 astropy
 pyyaml
+pandas
 requests
-socket
+# socket
+termcolor

@@ -37,7 +37,7 @@ if __name__ == "__main__":
         # print("\n\n\n")
 
         input(f"test \033[32;1mset_exposeure_parameters\033[0m - press enter: ")
-        exp_time = 1.0  # sec
+        exp_time = 10.0  # sec
 
         # Hopefully there will be a nicer way to set parameters in the future...
         exp_parameters = {}

@@ -61,7 +61,7 @@ class Ascol:
 
         self.debug = debug  # TODO: change debug mode so that the LOGGER is changed!
 
-        self.init_time = datetime.datetime.now()
+        self.init_time = time.time()
         self.delay = delay
 
         self.connect_socket()
