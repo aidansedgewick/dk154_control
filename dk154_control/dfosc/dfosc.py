@@ -12,10 +12,14 @@ TODO would it be easier to just have a library of grism, filter, and slit config
 """
 
 import time
-import socket
-from logging import getLogger
 
-logger = getLogger(__file__.split("/")[-1])
+# import socket
+import telnetlib
+import yaml
+from logging import getLogger
+from pathlib import Path
+
+logger = getLogger(__name__.split(".")[-1])
 
 """
 DFOSC commands for the MOXA
@@ -25,70 +29,117 @@ Includes aperture (slit), filter, and grism wheel commands.
 # TODO - get the IP and port number for the MOXA
 
 
-class Grism:
+def load_dfosc_setup(setup_path=None):
+    setup_path = setup_path or Path(__file__).parent / "dfosc_setup.yaml"
+    with open(setup_path, "r") as f:
+        return yaml.load(f, Loader=yaml.FullLoader)
 
-    INTERNAL_HOST = ""
+
+def guess_wheel_pos(current_pos, wheel_setup):
+    if len(wheel_setup) == 0:
+        return "???", None
+    likely_key, likely_val = min(
+        wheel_setup.items(), key=lambda x: (abs(current_pos - x[1]) % 320000)
+    )
+    return likely_key, likely_val
+
+
+class DfoscError(Exception):
+    pass
+
+
+class Dfosc:
+    """
+    Start a connection to the DFOSC MOXA to send commands to DFOSC.
+
+    Args:
+        external (bool): Not in use...
+        test_mode (bool): For testing with mock servers in `dk154_mock` package
+
+    """
+
+    INTERNAL_HOST = "192.168.132.58"
     EXTERNAL_HOST = ""
     MOXA_PORT = 4001  # TODO: get port number
     LOCAL_HOST = "127.0.0.1"
-    LOCAL_PORT = 8883
+    LOCAL_PORT = 8883  # Matches with MockDfoscServer
 
-    def __init__(self, external=False, test_mode=False):
+    def __init__(self, test_mode=False, debug=False, external=False):
 
         logger.info("initialise DFOSC grism wheel")
         if external:
             self.HOST = self.EXTERNAL_HOST
         else:
             self.HOST = self.INTERNAL_HOST
-        self.port = self.MOXA_PORT
+        self.PORT = self.MOXA_PORT
 
         self.test_mode = test_mode
         if self.test_mode:
             self.HOST = self.LOCAL_HOST
             self.PORT = self.LOCAL_PORT
-            logger.info(f"start Grism in TEST MODE (use localhost:{self.PORT})")
+            logger.info(f"starting in TEST MODE (use localhost:{self.PORT})")
+
+        self.debug = debug
 
         self.init_time = time.time()
 
-        # self.connect_socket()
+        try:
+            self.dfosc_setup = load_dfosc_setup()
+        except Exception as e:
+            self.dfosc_setup = {"grism": {}, "slit": {}, "filter": {}}
 
-    def connect_socket(self):
-        self.info("Grism socket connect")
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((self.HOST, self.PORT))
-        self.conn_timestamp()
-        self.sock = sock  # Don't name it 'socket' else overload module...
+        self.connect_telnet()
+
+    def connect_telnet(self):
+        logger.info("Dfosc telnet connect")
+        self.tn = telnetlib.Telnet(self.HOST, self.PORT)
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.sock.close()
-        logger.info("DFOSC Grism connection closed in __exit__")
+        self.tn.close()
+        logger.info("DFOSC telnet closed in __exit__")
 
     def get_data(self, command: str):
         """
-        The actual sending/recieving of TCP IP commands.
+        The actual sending/recieving of commands with telnet.
         returns a LIST (can be one element long)
-        Similar to ASCOL????
+
+        NB:
+        ===
+        `telnetlib` module is deprecated with python 3.11.
+        May be preferable to upgrade to SOCKET in future ?
         """
         command_code = command.split()[0]
         print_command = command
         logger.info(f"send: {print_command}")
 
-        send_command = (command + "\n").encode("utf-8")
-        # TODO there may be a timeout issue here, so would need a try block to reconnect
-        self.sock.sendall(send_command)  # Send the command to the TCS computer
+        send_command = (command + "\n").encode()
 
-        data = self.sock.recv(1024)  # Ask for the result, up to 1024 char long.
-        data = data.decode("ascii")  # Decode from binary string
-        data = data.rstrip()  # Strip some unimportant newlines
+        try:
+            logger.info(f"try sending {send_command}...")
+            print(self.tn)
+            self.tn.write(send_command)
+        except IOError as e:
+            logger.info("try to reconnect telnet...")
+            self.connect_telnet()
+            self.tn.write(send_command)
+            if self.debug:
+                logger.info("successful send after reconnect.")
+
+        TERMINATE_BYTES = "\n".encode("utf-8")  # telnet should return chars until THIS.
+        data = self.tn.read_until(TERMINATE_BYTES)
+        data = data.decode("utf-8")
+        data = data.rstrip()
         data = data.split()
+
+        logger.info(f"receive {data}")
 
         if len(data) == 1 and data[0] == "ERR":
             logger.warning(f"Result is ERR. Is {command_code} a 'set' command?")
 
-        return data
+        return tuple(data)
 
     def gi(self):
         """
@@ -96,7 +147,7 @@ class Grism:
         Only to be used after a power failure/cycle or if the grism has been moved manually.
         """
         command = f"GI"
-        (result_code,) = self.get_data(command)  # Unpack single element list.
+        result_code, *dummy_values = self.get_data("GI")
         return result_code
 
     def gg(self, x: str):
@@ -104,16 +155,15 @@ class Grism:
         Grism Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
         """
         command = f"GG{x}\n"
-        (result_code,) = self.get_data(command)  # Unpack single element list.
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def gm(self, x: str):
         """
         Grism Move relative nnnnnn. '+' or '-' can be entered before nnnnnn
         """
-
         command = f"GM {x}\n"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def gp(self):
@@ -121,7 +171,7 @@ class Grism:
         Grism Position, returns the current position value 'nnnnnn'
         """
         command = f"GP"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def gn(self, pos: str):
@@ -134,7 +184,7 @@ class Grism:
             logger.warning(msg)
 
         command = f"G{pos}"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def gq(self):
@@ -151,7 +201,8 @@ class Grism:
         Check driver ready. Returns 'y' if ready, 'n' if not ready.
         """
         command = f"g"
-        (return_code,) = self.getdata(command)
+        return_code, *dummy_values = self.get_data(command)
+        print(dummy_values)
         return return_code
 
     def gx(self):
@@ -168,102 +219,38 @@ class Grism:
         (return_code,) = self.get_data("Gidfoc")
         return return_code
 
-    def g_init(self):
+    def grism_init(self):
         """
         Grism wheel initialize
         """
         self.gi()
-        time.sleep(5)
-        wheel_rdy = self.g()
-        while wheel_rdy != "y":
-            logger.warning("Grism Wheel Not Ready")
-            time.sleep(2)
-            self.g()
+        time.sleep(5.0)
+        wheel_ready = self.g()
+        while wheel_ready != "y":
+            logger.warning("grism wheel not ready")
+            time.sleep(2.0)
+            wheel_ready = self.g()
+        return
 
-        return logger.info(f"Current Grism Position: {self.gp()}")
-
-    def goto(self, position: str):
+    def grism_goto(self, position: str, N_tries=24, sleep_time=5.0):
         """
         Grism Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
         """
-        wheel_ready = self.g()
-        if wheel_ready == "y":
-            logger.info("Grism Wheel Moving to Position")
-            self.gg(position)
-        else:
-            logger.warning("Grism Wheel Not Ready")
-
-        return print(f"Current Grism Position: {self.gp()}")
-
-
-class Slit:
-
-    INTERNAL_HOST = ""
-    EXTERNAL_HOST = ""
-    MOXA_PORT = 4001  # TODO: get port number
-    LOCAL_HOST = "127.0.0.1"
-    LOCAL_PORT = 8884
-
-    def __init__(self, external=False, test_mode=False):
-
-        logger.info("initialise DFOSC grism wheel")
-        if external:
-            self.HOST = self.EXTERNAL_HOST
-        else:
-            self.HOST = self.INTERNAL_HOST
-        self.port = self.MOXA_PORT
-
-        self.test_mode = test_mode
-        if self.test_mode:
-            self.HOST = self.LOCAL_HOST
-            self.PORT = self.LOCAL_PORT
-            logger.info(f"start Slit in TEST MODE (use localhost:{self.PORT})")
-
-        # self.connect_socket()
-
-    def connect_socket(self):
-        self.info("Grism socket connect")
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((self.HOST, self.PORT))
-        self.conn_timestamp = time.time()
-        self.sock = sock  # Don't name it 'socket' else overload module...
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.sock.close()
-        logger.info("DFOSC connection closed in __exit__")
-
-    def get_data(self, command: str):
-        """
-        The actual sending/recieving of TCP IP commands.
-        returns a LIST (can be one element long)
-        Similar to ASCOL????
-        """
-        command_code = command.split()[0]
-        print_command = command
-
-        logger.info(f"send: {print_command}")
-
-        send_command = (command + "\n").encode("utf-8")
-        self.sock.sendall(send_command)  # Send the command to the TCS computer
-        data = self.sock.recv(1024)  # Ask for the result, up to 1024 char long.
-        data = data.decode("ascii")  # Decode from binary string
-        data = data.rstrip()  # Strip some unimportant newlines
-        data = data.split()
-
-        if len(data) == 1 and data[0] == "ERR":
-            logger.warning(f"Result is ERR. Is {command_code} a 'set' command?")
-
-        return data
+        for ii in range(N_tries):
+            filter_ready = self.a()
+            if filter_ready == "y":
+                logger.info(f"filter ready: move to {position}")
+                result = self.ag(position)
+                return result
+            time.sleep(sleep_time)
+        raise DfoscError(f"DFOSC grism wheel not ready after {N_tries}")
 
     def ai(self):
         """
         Aperture Initialize position to hall switch and aperture_zero offset
         """
         command = f"AI"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def ag(self, position: str):
@@ -271,7 +258,7 @@ class Slit:
         Aperture Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
         """
         command = f"AG{position}"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def am(self, position: str):
@@ -279,7 +266,7 @@ class Slit:
         Aperture Move relative nnnnnn. '+' or '-' can be entered before nnnnnn
         """
         command = f"AM{position}"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def ap(self):
@@ -287,7 +274,8 @@ class Slit:
         Aperture Position 'nnnnnn'
         """
         command = f"AP"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
+        print(result_code, dummy_values)
         return result_code
 
     def an(self, position: str):
@@ -300,7 +288,7 @@ class Slit:
             logger.warning(msg)
 
         command = f"A{position}"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def aq(self):
@@ -308,7 +296,7 @@ class Slit:
         Aperture Quit current operation. Must be called quickly after command is sent.
         """
         command = f"AQ"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def a(self):
@@ -316,7 +304,7 @@ class Slit:
         Check driver ready. Returns 'y' if ready, 'n' if not ready.
         """
         command = f"a"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def ax(self):
@@ -324,7 +312,7 @@ class Slit:
         Aperture Goto hall initial position. Ressets aperture_zero to 0
         """
         command = f"AX"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def aidfoc(self):
@@ -332,105 +320,42 @@ class Slit:
         Set zero position to current position. Records the aperture_zero value in eeprom.
         """
         command = f"Aidfoc"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
-    def a_init(self):
+    def aperture_init(self):
         """
         Aperture initialize
         """
         self.ai()
 
-        time.sleep(5)
+        time.sleep(5.0)
         wheel_rdy = self.a()
         while wheel_rdy != "y":
-            logger.warning("Aperture Wheel Not Ready")
-            time.sleep(2)
+            logger.warning("aperture wheel not ready")
+            time.sleep(2.0)
             self.a()
+        return
 
-        return print(f"Current Aperture Position: {self.ap()}")
-
-    def goto(self, position: str):
+    def aperture_goto(self, position: str, N_tries=30, sleep_time=5.0):
         """
         Aperture Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
         """
-        self.a()
-        if self.a() == "y":
-            logger.info("Aperture Wheel Moving to Position")
-            self.ag(position)
-        else:
-            logger.warning("Aperture Wheel Not Ready")
-
-        return print(f"Current Aperture Position: {self.ap()}")
-
-
-class Filter:
-
-    INTERNAL_HOST = ""
-    EXTERNAL_HOST = ""
-    MOXA_PORT = 4001  # TODO: get port number
-    LOCAL_HOST = "127.0.0.1"
-    LOCAL_PORT = 8885
-
-    def __init__(self, external=False, test_mode=False):
-
-        logger.info("initialise DFOSC filter wheel")
-        if external:
-            self.HOST = self.EXTERNAL_HOST
-        else:
-            self.HOST = self.INTERNAL_HOST
-        self.port = self.MOXA_PORT
-
-        self.test_mode = test_mode
-        if self.test_mode:
-            self.HOST = self.LOCAL_HOST
-            self.PORT = self.LOCAL_PORT
-            logger.info(f"start Filter in TEST MODE (use localhost:{self.PORT})")
-
-        # self.connect_socket()
-
-    def connect_host(self):
-        self.info("Filter socket connect")
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((self.HOST, self.PORT))
-        self.conn_timestamp = time.time()
-        self.sock = sock  # Don't name it 'socket' else overload module...
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.sock.close()
-        logger.info("Filter connection closed in __exit__")
-
-    def get_data(self, command: str):
-        """
-        The actual sending/recieving of TCP IP commands.
-        returns a LIST (can be one element long)
-        """
-        command_code = command.split()[0]
-        print_command = command
-
-        logger.info(f"send: {print_command}")
-
-        send_command = (command + "\n").encode("utf-8")
-        self.sock.sendall(send_command)  # Send the command to the TCS computer
-        data = self.sock.recv(1024)  # Ask for the result, up to 1024 char long.
-        data = data.decode("ascii")  # Decode from binary string
-        data = data.rstrip()  # Strip some unimportant newlines
-        data = data.split()
-
-        if len(data) == 1 and data[0] == "ERR":
-            logger.warning(f"Result is ERR. Is {command_code} a 'set' command?")
-
-        return data
+        for ii in range(N_tries):
+            filter_ready = self.a()
+            if filter_ready == "y":
+                logger.info(f"filter ready: move to {position}")
+                result = self.ag(position)
+                return result
+            time.sleep(sleep_time)
+        raise DfoscError(f"DFOSC aperture wheel not ready after {N_tries}")
 
     def fi(self):
         """
         Filter Initialize position to hall switch and filter_zero offset
         """
         command = f"FI"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def fg(self, position: str):
@@ -438,7 +363,7 @@ class Filter:
         Filter Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
         """
         command = f"FG{position}"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def fm(self, position: str):
@@ -446,7 +371,7 @@ class Filter:
         Filter Move relative nnnnnn. '+' or '-' can be entered before nnnnnn
         """
         command = f"FM{position}"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def fp(self):
@@ -454,7 +379,7 @@ class Filter:
         Filter Position 'nnnnnn'
         """
         command = f"FP"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def fn(self, position: str):
@@ -467,7 +392,7 @@ class Filter:
             logger.warning(msg)
 
         command = f"F{position}"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def fq(self):
@@ -475,7 +400,7 @@ class Filter:
         Filter Quit current operation. Must be called quickly after command is sent.
         """
         command = f"FQ"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def f(self):
@@ -483,7 +408,7 @@ class Filter:
         Check driver ready. Returns 'y' if ready, 'n' if not ready.
         """
         command = f"f"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def fx(self):
@@ -491,7 +416,7 @@ class Filter:
         Filter Goto hall initial position. Ressets aperture_zero to 0
         """
         command = f"FX"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def fidfoc(self):
@@ -499,36 +424,63 @@ class Filter:
         Set zero position to current position. Records the aperture_zero value in eeprom.
         """
         command = f"Fidfoc"
-        (result_code,) = self.get_data(command)
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
-    def f_init(self):
+    def filter_init(self):
         """
         Filter wheel initialize
         """
         self.fi()
-
-        time.sleep(5)
-
-        self.f()
-
+        time.sleep(5.0)
         while self.f() != "y":
             logger.warning("Filter Wheel Not Ready")
-            time.sleep(2)
-            self.f()
+            time.sleep(2.0)
+        return
 
-        return print(f"Current Filter Position: {self.fp()}")
-
-    def goto(self, position: str):
+    def filter_goto(self, position: str, N_tries=30, sleep_time=5.0):
         """
         Filter Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
         """
-        self.f()
 
-        if self.f() == "y":
-            logger.info("Filter Wheel Moving to Position")
-            self.fg(position)
-        else:
-            logger.warning("Filter Wheel Not Ready")
+        for ii in range(N_tries):
+            filter_ready = self.f()
+            if filter_ready == "y":
+                logger.info(f"filter ready: move to {position}")
+                result = self.fg(position)
+                return result
+            time.sleep(sleep_time)
+        raise DfoscError(f"DFOSC filter wheel not ready after {N_tries}")
 
-        return print(f"Current Filter Position: {self.fp()}")
+    def log_all_status(self):
+        grism_ready = self.g()
+        grism_pos = self.gp()
+        aper_ready = self.a()
+        aper_pos = self.ap()
+        filter_ready = self.f()
+        filter_pos = self.fp()
+
+        try:
+            grism_guess, grism_value = guess_wheel_pos(
+                grism_pos, self.dfosc_setup["grism"]
+            )
+            aper_guess, aper_value = guess_wheel_pos(
+                grism_pos, self.dfosc_setup["slit"]
+            )
+            filter_guess, filter_value = guess_wheel_pos(
+                grism_pos, self.dfosc_setup["filter"]
+            )
+        except Exception as e:
+            grism_guess, aper_guess, filter_pos = "?", "?", "?"
+
+        status_str = (
+            f"DFOSC status:\n"
+            f"    grism wheel ready? {grism_ready}\n"
+            f"    aper wheel ready? {aper_ready}\n"
+            f"    filter wheel ready? {filter_ready}\n"
+            f"    grism pos: {grism_pos} (likely '{grism_guess}')\n"
+            f"    aper pos: {aper_pos} (likely '{aper_guess}')\n"
+            f"    filter pos: {filter_pos} (likely '{filter_guess}')\n"
+        )
+
+        logger.info(status_str)

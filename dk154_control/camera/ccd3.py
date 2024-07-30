@@ -28,7 +28,7 @@ class Ccd3:
     INTERNAL_URL = "http://192.168.132.52:8889/"
     LOCAL_URL = "http://127.0.0.1:8889/"
     USER = "dk154"
-    PASSWORD = "dk154"
+    _PASSWORD = "dk154"
 
     EXPOSURE_SLEEP_BUFFER = 3.0
 
@@ -60,9 +60,6 @@ class Ccd3:
         pass
 
     def get_data(self, url, params):
-
-        if self.test_mode:
-            return {"state": 0}
 
         response = requests.get(url, auth=self.auth, params=params)
         time.sleep(0.5)  # Czech scripts show waiting 0.5s after calling is helpful.
@@ -121,6 +118,7 @@ class Ccd3:
         filename [str]
             the name of the file to save.
         """
+        logger.info("starting exposure")
 
         if self.current_exposure_parameters is None:
             msg = (

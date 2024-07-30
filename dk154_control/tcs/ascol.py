@@ -6,11 +6,9 @@ Based on ASCOL protocol: from doc v1.1.0 (20-07-2014)
 24-11-23
 """
 
-import datetime
 import time
 import socket
 from logging import getLogger
-
 
 from dk154_control.tcs import ascol_constants
 
@@ -21,12 +19,42 @@ class AscolInputError(Exception):
     pass
 
 
+class WaitForResultTimeoutError(Exception):
+    pass
+
+
 class Ascol:
     """
     ASCOL implemented as in the documentation v1.1.0 (20-07-2014)
 
     For ASCOL commands, any inputs are **always** accepted as strings.
     Some are accepted as integers, strings are better...
+
+    All ASCOL commands are logged in the logging files, for debugging at a later
+    date.
+
+    Many ASCOL commands have methods defined, which translates the ASCOL response
+    into a human readable string.
+
+    Example:
+        It's preferable to use Ascol() in a ``with`` block, as this makes sure
+        connections to the ASCOL server are closed nicely.
+
+        >>> from dk154_control import Ascol
+        >>> with Ascol() as ascol:
+        ...     ra, dec, tel_pos = ascol.trrd()
+        ...     tel_state = ascol.ters() # '05' is translated to 'sky track'
+        >>> print(f"ra={ra}, dec={dec}, state={tel_state})
+        ra=120000.00, dec=-300000.00, state=sky track
+
+    Args:
+        test_mode (bool, default: ``False``): For testing commands with
+            the ``dk154_mock`` package.
+        debug (bool, default: ``False``): Log extra information (eg. success
+            on sending commands, 'raw' ASCOL response.)
+        delay (float, optional):
+            If provided, wait this many seconds before sending commands after request.
+        external (bool): Use the external IP address. Unlikely to be needed...
     """
 
     INTERNAL_HOST = "192.168.132.11"  # The remote host, internal IP of the TCS
@@ -36,15 +64,16 @@ class Ascol:
         2003  # Same port used by the server, ports avail 2001-2009, 2007 is occupied
     )
     LOCAL_PORT = 8888  # Alt-HTTP port -- safe to use?
-    GLOBAL_PASSWORD = "1178"
+    _GLOBAL_PASSWORD = "1178"
 
     def __init__(
         self,
-        external: bool = False,
         test_mode: bool = False,
         debug: bool = False,
         delay: float = None,
+        external: bool = False,
     ):
+
         logger.info("initialise Ascol")
         self.external = external
         if self.external:
@@ -67,6 +96,9 @@ class Ascol:
         self.connect_socket()
 
     def connect_socket(self):
+        """
+        (Re-)connect to the ASCOL server.
+        """
         logger.info("socket connect")
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((self.HOST, self.PORT))
@@ -84,9 +116,30 @@ class Ascol:
 
     def get_data(self, command: str) -> tuple:
         """
-        The actual sending/recieving of TCP IP commands.
+        The actual sending/recieving of TCP IP commands to ASCOL server.
+        The command will have newline ``\\n`` appended,
+        and be encoded to bytes before sending.
 
-        Returns a tuple (can be one element long)
+        You can use this method to send ASCOL commands and recive the 'raw' ASCOL
+        server response.
+        Or, you should use this if the command you want doesn't have it's own method.
+
+        Args:
+            command (str): A command recognised by ASCOL. It might be the case
+                that your command needs to send the GLOBAL PASSWORD first.
+                In that case, use ascol.gllg() or ascol.get_data("GLLG").
+
+        Returns:
+            data (tuple): The result of the command.
+
+        Example
+        -------
+
+        >>> with Ascol() as ascol:
+        ...     result = ascol.get_data("TERS")
+        >>> print(result) # 05 will not be 'translated' to human readable 'sky track'
+        05
+
         """
 
         print_command = command
@@ -130,41 +183,53 @@ class Ascol:
 
         return data
 
-    def wait_for_result(self, func, exp_result, delay=2.0, timeout=180.0):
+    def wait_for_result(self, func, expected_result, delay=5.0, timeout=180.0):
         """
         Run a command repeatedly (with delay) until the expected result is returned.
 
-        # This function is experimental!
+        Note:
+            This function is experimental!
 
-        Parameters
-        ----------
-        func
-            The (ASCOL) function to run many times.
-        exp_result
-            The expected result (eg. "sky track")
-        delay
-            sleep time between repeats [float: sec]
-        timeout
-            give up after this many seconds [float: sec]
+        Args:
+            func (Callable): The (ASCOL) function to run many times.
+            exp_result (str or tuple of str): The expected result (eg. "sky track")
+            delay (float, default: 180.0): sleep time between repeats [in sec]
+            timeout (float): give up after this many seconds
 
-        eg.
-        >>> res = ascol.wait_for_result(ascol.ters, "sky track") #  Note no () after ters!!
-        >>> print(res)
-        "sky track"
+        Returns:
+            result: The result of `func` which matched `expected_result`
+
+        Examples:
+            Note: don't call the function (ie, no parentheses after `ascol.ters`.)
+
+            >>> with Ascol() as ascol:
+            ...     result = ascol.wait_for_result(ascol.ters, "sky_track")
+
         """
+
+        if isinstance(expected_result, str):
+            expected_result = [expected_result]  # now can always check result 'in'
+
+        func_name = func.__name__.upper()
+        res_str = "/".join(expected_result)
+        logger.info(f"wait for result: {res_str}")
+
         t_start = time.time()
         while time.time() - t_start < timeout:
             result = func()
-            if result == exp_result:
-                break
+            if result in expected_result:
+                logger.info(f"{func_name} returned '{result}': exit")
+                return result
             time.sleep(delay)
-        return result
+        msg = f"wait for {func_name} did not result in {expected_result} before timeout {timeout:.2f}s"
+        raise WaitForResultTimeoutError(msg)
 
     def glre(self):
         """
         GLobal read REmote state [Not defined in ASCOL doc]
 
-        Returns human-readable string
+        Returns:
+            result: a human-readable string
         """
         command = f"GLRE"
         result_code, *dummy_values = self.get_data(command)
@@ -174,7 +239,8 @@ class Ascol:
         """
         GLobal read Safety Relay state [Not defined in ASCOL doc]
 
-        Returns human-readable string
+        Returns:
+            result (str): a human-readable string
         """
         command = f"GLSR"
         result_code, *dummy_values = self.get_data(command)
@@ -184,9 +250,14 @@ class Ascol:
         """
         GLobal LoGin [ASCOL 2.2]
 
-        Returns 0 (wrong pwd) 1 (correct)
+        Args:
+            password (str, default: "****"): Send this string as the password to the server.
+                You will likely never need to provide this.
+
+        Returns:
+            password_result (str): 0 (wrong pwd) or 1 (correct)
         """
-        password = password or self.GLOBAL_PASSWORD
+        password = password or self._GLOBAL_PASSWORD
 
         command = f"GLLG {password}"
         result_code, *dummy_values = self.get_data(command)
@@ -197,7 +268,10 @@ class Ascol:
         """
         GLobal read Latitude and Longitude [ASCOL 2.3]
 
-        Returns lat [str: hhmmdd.dd], lon [str: ]
+        Returns:
+            tuple containing
+                lat (str): latitude in format hhmmss.ss
+                lon (str): longitude in format +ddmmss.ss
         """
         lat, lon = self.get_data("GLLL")
         return lat, lon
@@ -206,7 +280,9 @@ class Ascol:
         """
         GLobal read UTC [ASCOL 2.4]
 
-        Returns date [int: MJD], time [str: hhmmss.sss]
+        Returns:
+            MJD (int): The date part of the current UTC.
+            time_str (str): The time in format hhmmss.ss
         """
         mjd, time_str, *dummy_values = self.get_data("GLUT")
         return int(mjd), time_str
@@ -215,7 +291,8 @@ class Ascol:
         """
         GLobal read SiDereal time [ASCOL 2.5]
 
-        Returns time [str: hhmmss.ss]
+        Returns:
+            time (str): format hhmmss.ss (eg. 120000.00)
         """
         time_str, *dummy_values = self.get_data("GLSD")
         return time_str
@@ -224,7 +301,8 @@ class Ascol:
         """
         GLobal DePartment [ASCOL 2.6]
 
-        Returns department (human-readable string)
+        Returns:
+            department (str): a human-readable string
         """
         result_code, *dummy_values = self.get_data("GLDP")
         return ascol_constants.GLDP_CODES.get(
@@ -235,12 +313,13 @@ class Ascol:
         """
         Telescope ON/off [ASCOL 2.10]
 
-        Parameters
-        ----------
-        on_off [1 - on, 0 - off]
+        Parameters:
+            on_off (str): [1 - on, 0 - off]
 
-        Returns "1" (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
+        self.gllg()  # Requires set password
 
         on_off = str(on_off)
         if on_off not in ["1", "0"]:
@@ -255,7 +334,8 @@ class Ascol:
         """
         TElescope STop [ASCOL 2.11]
 
-        Returns "1" (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         self.gllg()
         return self.get_data("TEST")
@@ -264,7 +344,8 @@ class Ascol:
         """
         TElescope FLip [ASCOL 2.13]
 
-        Returns "1" (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         self.gllg()
         return self.get_data("TEFL")
@@ -273,7 +354,8 @@ class Ascol:
         """
         Telescope PArk [ASCOL 2.14]
 
-        Returns "1" (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         self.gllg()  # Set commands require global password
         return self.get_data("TEPA")
@@ -282,7 +364,8 @@ class Ascol:
         """
         TElescope INitialization [ASCOL 2.15]
 
-        Returns "1" (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         self.gllg()
         return self.get_data("TEIN")
@@ -291,13 +374,13 @@ class Ascol:
         """
         Telescope Set Right Ascension and declination [ASCOL 2.17]
 
-        Parameters
-        ----------
-        ra [str: hhmmss.s]
-        dec [str: ddmmss.s]
-        position [str: 0 - east, 1 - west]
+        Args:
+            ra (str): hhmmss.s
+            dec (str): ddmmss.s
+            position (str): 0 - east, 1 - west
 
-        Returns "1" (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         self.gllg()  # Set commands require global password
         command = f"TSRA {ra} {dec} {position}"
@@ -309,7 +392,8 @@ class Ascol:
         """
         Telescope Go Right Ascension and declination [ASCOL 2.19]
 
-        Returns 1 (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         self.gllg()  # Set commands require global password
         result_code, *dummy_values = self.get_data("TGRA")
@@ -319,7 +403,10 @@ class Ascol:
         """
         Telescope Read Right ascension and Declination [ASCOL 2.41]
 
-        Returns RA [str: hhmmss.s], Dec [str: +ddmmss.s], position [str: east/west].
+        Returns:
+            RA (str): right ascension, format hhmmss.s
+            dec (str): declination, format +ddmmss.s
+            position (str): east/west
         """
         ra, dec, position_code, *dummy_values = self.get_data("TRRD")
         return ra, dec, ascol_constants.TRRD_POSITION_CODES[position_code]
@@ -328,7 +415,8 @@ class Ascol:
         """
         TElescope Read State. [ASCOL 2.43]
 
-        Returns human-readable string.
+        Returns:
+            result (str): a human-readable string
         """
         result_code, *dummy_values = self.get_data("TERS")
         return ascol_constants.TERS_CODES[result_code]
@@ -337,11 +425,11 @@ class Ascol:
         """
         DOme Set Absolute position [ASCOL 2.44]
 
-        Parameters
-        ----------
-        dome_pos [ddd.dd: str] (eg. 0.00-359.99)
+        Args:
+            dome_pos (str): formatted as ddd.dd: (eg. 0.00-359.99)
 
-        Returns "1" (ok)
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         if isinstance(dome_pos, float):
             dome_pos = f"{dome_pos:.2f}"
@@ -353,7 +441,8 @@ class Ascol:
         """
         DOme Go Absolute position [ASCOL 2.45]
 
-        Returns "1" (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         result_code, *dummy_values = self.get_data("DOGA")
         return result_code
@@ -362,7 +451,8 @@ class Ascol:
         """
         DOme AutoMated [ASCOL 2.46]
 
-        Returns "1" (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         self.gllg()
         result_code, *dummy_values = self.get_data("DOAM")
@@ -372,7 +462,8 @@ class Ascol:
         """
         DOme PArk [ASCOL 2.47]
 
-        Returns "1" (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         self.gllg()
         result_code, *dummy_values = self.get_data("DOPA")
@@ -382,7 +473,8 @@ class Ascol:
         """
         DOme INitialization [ASCOL 2.48]
 
-        Returns "1" (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         self.gllg()
         result_code, *dummy_values = self.get_data("DOIN")
@@ -392,11 +484,11 @@ class Ascol:
         """
         DOme Slit Open/close [ASCOL 2.50]
 
-        Parameters
-        ----------
-        open_close [1 - open, 0 - close]
+        Args:
+            open_close (str): 1 - open, 0 - close
 
-        Returns "1" (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         self.gllg()
         command = f"DOSO {open_close}"
@@ -405,9 +497,10 @@ class Ascol:
 
     def dost(self):
         """
-        DOme STop
+        DOme STop [ASCOL 2.51]
 
-        Returns 1 (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         self.gllg()
         result_code, *dummy_values = self.get_data("DOST")
@@ -417,7 +510,8 @@ class Ascol:
         """
         DOme Read State [ASCOL 2.56]
 
-        Returns human-readable string
+        Returns:
+            dome_state (str): "1" (ok) or ERR
         """
         return_code, *dummy_values = self.get_data("DORS")
         return ascol_constants.DORS_CODES[return_code]
@@ -426,11 +520,11 @@ class Ascol:
         """
         Flap Cassegrain OPen/close [ASCOL 2.57]
 
-        Parameters
-        ----------
-        open_close [1 - open, 0 - close]
+        Args:
+            open_close (str): 1 - open, 0 - close
 
-        Returns 1 (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         open_close = str(open_close)
         if open_close not in ["1", "0"]:
@@ -445,7 +539,8 @@ class Ascol:
         """
         Flap Cassegrain Read State [ASCOL 2.59]
 
-        Returns human-readable string
+        Returns:
+            flap_cass_state (str): "1" (ok) or ERR
         """
         result_code, *dummy_values = self.get_data("FCRS")
         return ascol_constants.FCRS_CODES[result_code]
@@ -454,11 +549,11 @@ class Ascol:
         """
         Flap Mirror OPen/close [ASCOL 2.60]
 
-        Parameters
-        ----------
-        open_close [1 - open, 0 - close]
+        Args:
+            open_close (str): 1 - open, 0 - close
 
-        Returns 1 (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         open_close = str(open_close)
         if open_close not in ["1", "0"]:
@@ -474,7 +569,8 @@ class Ascol:
         """
         Flap Mirror Read State [ASCOL 2.62]
 
-        Returns human-readable string
+        Returns:
+            flap_mirror_state (str): "1" (ok) or ERR
         """
         result_code, *dummy_values = self.get_data("FMRS")
         return ascol_constants.FMRS_CODES[result_code]
@@ -483,11 +579,11 @@ class Ascol:
         """
         Wheel A Set Position [ASCOL 2.63]
 
-        Parameters
-        ----------
-        position [str: 0-7]
+        Args:
+            position (str): wheel a position, 0-7 (see ``ascol_constants.WARP_CODES``)
 
-        Returns 1 (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         if int(position) not in range(8):  # range(8) incl. 0, excl, 8
             msg = f"Wheel A has positions 0-7; provided: {position}"
@@ -502,7 +598,8 @@ class Ascol:
         """
         Wheel A Go Position [ASCOL 2.64]
 
-        Returns 1 (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         self.gllg()  # Set commands require global password
         result_code, *dummy_values = self.get_data("WAGP")
@@ -512,7 +609,8 @@ class Ascol:
         """
         Wheel A Read Position [ASCOL 2.66]
 
-        Returns human-readable string
+        Returns:
+            wheel_a_pos (str): human-readable string
         """
         result_code, *dummy_values = self.get_data("WARP")
         return ascol_constants.WARP_CODES[result_code]
@@ -521,7 +619,8 @@ class Ascol:
         """
         Wheel A Read State [ASCOL 2.68]
 
-        Returns human-readable string
+        Returns:
+            wheel_a_state (str): human-readable string
         """
         result_code, *dummy_values = self.get_data("WARS")
         return ascol_constants.WARS_CODES[result_code]
@@ -530,11 +629,12 @@ class Ascol:
         """
         Wheel B Set Position [ASCOL 2.69]
 
-        Parameters
-        ----------
-        position [str: 0-6]
 
-        Returns 1 (ok) or ERR
+        Args:
+            position (str): wheel a position, 0-6 (see ``ascol_constants.WBRP_CODES``)
+
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         if int(position) not in range(7):  # range(7) incl. 0, excl. 7
             msg = f"Wheel B has positions 0-6; provided: {position}"
@@ -549,7 +649,8 @@ class Ascol:
         """
         Wheel B Go Position [ASCOL 2.70]
 
-        Returns 1 (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
         self.gllg()  # Set commands require global login
         result_code, *dummy_values = self.get_data("WBGP")
@@ -559,7 +660,8 @@ class Ascol:
         """
         Wheel B Read Position [ASCOL 2.72]
 
-        Returns human-readable string
+        Returns:
+            wheel_b_pos (str): human-readable string
         """
         result_code, *dummy_values = self.get_data("WBRP")
         return ascol_constants.WBRP_CODES[result_code]
@@ -568,7 +670,8 @@ class Ascol:
         """
         Wheel B Read State [ASCOL 2.74]
 
-        Returns human-readable string
+        Returns:
+            wheel_b_state (str): human-readable string
         """
         result_code, *dummy_values = self.get_data("WBRS")
         return ascol_constants.WBRS_CODES[result_code]
@@ -577,9 +680,9 @@ class Ascol:
         """
         FOcus Read Absolute position [ASCOL 2.82]
 
-        Returns focus_pos [float: mm]
+        Returns:
+            focus_pos (float): focus absolule position [mm]
         """
-
         focus_pos, *dummy_values = self.get_data("FORA")
         return float(focus_pos)
 
@@ -587,7 +690,8 @@ class Ascol:
         """
         FOcus Read State [ASCOL 2.87]
 
-        Returns human-readable string
+        Returns:
+            focus_state (str): human-readable string
         """
         result_code, *dummy_values = self.get_data("FORS")
         return ascol_constants.FORS_CODES[result_code]
@@ -600,8 +704,11 @@ class Ascol:
         ----------
         open_close [1 - open, 0 - close]
 
-        Returns "1" (ok) or ERR
+        Returns:
+            result (str): "1" (ok) or ERR
         """
+        self.gllg()  # Set global password required.
+
         open_close = str(open_close)
         if open_close not in ["1", "0"]:
             errstr = "shop: use input '1' for open, '0' for close"
@@ -614,7 +721,8 @@ class Ascol:
         """
         SHutter Read Position [ASCOL 2.135]
 
-        Returns human-readable string
+        Returns:
+            shutter_pos (str): human-readable string
         """
         result_code, *dummy_values = self.get_data("SHRP")
         return ascol_constants.SHRP_CODES[result_code]
@@ -623,7 +731,9 @@ class Ascol:
         """
         MEteo Brightness East [ASCOL 2.136]
 
-        Returns brightness [float: kLux], validity [str]
+        Returns:
+            brightness (float): kLux
+            validity (str)
         """
         command = f"MEBE"
         brightness, validity_code, *dummy_values = self.get_data(command)
@@ -633,7 +743,9 @@ class Ascol:
         """
         MEteo Brightness North [ASCOL 2.137]
 
-        Returns brightness [float: kLux], validity [str]
+        Returns:
+            brightness (float): kLux
+            validity (str)
         """
         brightness, validity_code, *dummy_values = self.get_data("MEBN")
         return float(brightness), ascol_constants.MEBN_VALIDITY_CODES[validity_code]
@@ -642,7 +754,9 @@ class Ascol:
         """
         MEteo Brightness West [ASCOL 2.138]
 
-        Returns brightness [float: kLux], validity [str]
+        Returns:
+            brightness (float): kLux
+            validity (str)
         """
         brightness, validity_code, *dummy_values = self.get_data("MEBW")
         return float(brightness), ascol_constants.MEBW_VALIDITY_CODES[validity_code]
@@ -651,7 +765,9 @@ class Ascol:
         """
         MEteo TWilight [ASCOL 2.139]
 
-        Returns twilight [float: Lux], validity [str]
+        Returns:
+            twilight (float): Lux
+            validity (str)
         """
         brightness, validity_code, *dummy_values = self.get_data("METW")
         return float(brightness), ascol_constants.METW_VALIDITY_CODES[validity_code]
@@ -660,7 +776,9 @@ class Ascol:
         """
         MEteo HUmidity [ASCOL 2.140]
 
-        Returns Humidity [float: percentage], validity [str]
+        Returns:
+            brightness (float): percentage
+            validity (str)
         """
         humidity, validity_code, *dummy_values = self.get_data("MEHU")
         return float(humidity), ascol_constants.MEHU_VALIDITY_CODES[validity_code]
@@ -669,7 +787,9 @@ class Ascol:
         """
         MEteo TEmperature [ASCOL 2.141]
 
-        Returns temperature [float: celcius], validity [str]
+        Returns:
+            temperature (float): celcius]
+            validity (str)
         """
         temperature, validity_code, *dummy_values = self.get_data("METE")
         return float(temperature), ascol_constants.METE_VALIDITY_CODES[validity_code]
@@ -678,7 +798,9 @@ class Ascol:
         """
         MEteo Wind Speed [ASCOL 2.142]
 
-        Returns wind_speed [float: m/s], validity [str]
+        Returns:
+            wind_speed (float): m/s
+            validity (str)
         """
         wind_speed, validity_code, *dummy_values = self.get_data("MEWS")
         return float(wind_speed), ascol_constants.MEWS_VALIDITY_CODES[validity_code]
@@ -687,7 +809,9 @@ class Ascol:
         """
         MEteo PRecipitation [ASCOL 2.143]
 
-        Returns precipitiation [str: yes/no], validity [str]
+        Returns:
+            precipitiation (str): yes/no
+            validity (str)
         """
         precip_code, validity_code, *dummy_values = self.get_data("MEPR")
         return (
@@ -699,7 +823,9 @@ class Ascol:
         """
         MEteo Atmospheric Pressure [ASCOL 2.144]
 
-        Returns atmospheric_pressure [float: mbar], validity [str]
+        Returns:
+            atmospheric_pressure (float): mbar
+            validity (str)
         """
         pressure, validity_code, *dummy_values = self.get_data("MEAP")
         return float(pressure), ascol_constants.MEPR_VALIDITY_CODES[validity_code]
@@ -708,7 +834,9 @@ class Ascol:
         """
         MEteo PYrgeometer [ASCOL 2.145]
 
-        Returns irradience [float: W/m2], validity [str]
+        Returns:
+            irradience (float): W/m2
+            validity (str)
         """
         irradience, validity_code, *dummy_values = self.get_data("MEPY")
         return float(irradience), ascol_constants.MEPY_VALIDITY_CODES[validity_code]
@@ -717,7 +845,8 @@ class Ascol:
         """
         DOme read Slit State [Not defined in ASCOL document]
 
-        Returns human-readable string
+        Returns:
+            slit_state (str): human-readable string
         """
         result_code, *dummy_values = self.get_data("DOSS")
         return ascol_constants.DOSS_CODES[result_code]
@@ -726,7 +855,8 @@ class Ascol:
         """
         DOme read LAmp state [Not defined in ASCOL document]
 
-        Returns human-readable string
+        Returns:
+            lamp_state (str): human-readable string
         """
         result_code, *dummy_values = self.get_data("DOLA")
         return ascol_constants.DOLA_CODES[result_code]
@@ -735,7 +865,8 @@ class Ascol:
         """
         Vent NOrth read State [Not defined in ASCOL document]
 
-        Returns human-readable string
+        Returns:
+            n_vent_state (str): human-readable string
         """
         vnos_code, *dummy_values = self.get_data("VNOS")
         return ascol_constants.VNOS_CODES.get(vnos_code, f"Unknown code {vnos_code}")
@@ -744,7 +875,8 @@ class Ascol:
         """
         Vent NorthEast read State [Not defined in ASCOL document]
 
-        Returns human-readable string
+        Returns:
+            ne_vent_state (str): human-readable string
         """
         vnes_code, *dummy_values = self.get_data("VNES")
         return ascol_constants.VNES_CODES.get(vnes_code, f"Unknown code {vnes_code}")
@@ -753,7 +885,8 @@ class Ascol:
         """
         Vent EAst read State [Not defined in ASCOL document]
 
-        Returns human-readable string
+        Returns:
+            e_vent_state (str): human-readable string
         """
         veas_code, *dummy_values = self.get_data("VEAS")
         return ascol_constants.VNOS_CODES.get(veas_code, f"Unknown code {veas_code}")
@@ -762,7 +895,8 @@ class Ascol:
         """
         Vent SouthEast read State [Not defined in ASCOL document]
 
-        Returns human-readable string
+        Returns:
+            se_vent_state (str): human-readable string
         """
         vses_code, *dummy_values = self.get_data("VSES")
         return ascol_constants.VSES_CODES.get(vses_code, f"Unknown code {vses_code}")
@@ -771,7 +905,8 @@ class Ascol:
         """
         Vent SOuth read State [Not defined in ASCOL document]
 
-        Returns human-readable string
+        Returns:
+            s_vent_state (str): human-readable string
         """
         vsos_code, *dummy_values = self.get_data("VSOS")
         return ascol_constants.VSOS_CODES.get(vsos_code, f"Unknown code {vsos_code}")
@@ -780,7 +915,8 @@ class Ascol:
         """
         Vent SouthWest read State [Not defined in ASCOL document]
 
-        Returns human-readable string
+        Returns:
+            sw_vent_state (str): human-readable string
         """
         vsws_code, *dummy_values = self.get_data("VSWS")
         return ascol_constants.VNOS_CODES.get(vsws_code, f"Unknown code {vsws_code}")
@@ -789,7 +925,8 @@ class Ascol:
         """
         Vent WEst read State [Not defined in ASCOL document]
 
-        Returns human-readable string
+        Returns:
+            w_vent_state (str): human-readable string
         """
         vwes_code, *dummy_values = self.get_data("VWES")
         return ascol_constants.VWES_CODES.get(vwes_code, f"Unknown code {vwes_code}")
@@ -798,12 +935,17 @@ class Ascol:
         """
         Vent NorthWest read State [Not defined in ASCOL document]
 
-        Returns human-readable string
+        Returns:
+            nw_vent_state (str): human-readable string
         """
         vnws_code, *dummy_values = self.get_data("VNWS")
         return ascol_constants.VNWS_CODES.get(vnws_code, f"Unknown code {vnws_code}")
 
     def log_all_status(self):
+        """
+        Log the position/state of telescope, dome, wheels and mirrors.
+        """
+
         remote_state = self.glre()
         safety_relay_state = self.glsr()
         telescope_state = self.ters()
@@ -831,4 +973,31 @@ class Ascol:
             f"    wheel B pos. [WBRP]: {wheel_b_position}\n"
         )
         logger.info(f"{status_str}")
+        return
+
+    def log_meteo_status(self):
+
+        with Ascol(test_mode=self.test_mode) as ascol:
+            twilight, tw_valid = ascol.metw()  # Lux
+            # brightness_east, be_valid = ascol.mebe()  # kLux
+            # brightness_north, bn_valid = ascol.mebn()  # kLux
+            # brightness_west, bw_valid = ascol.mebn()  # kLux
+            humidity, hu_valid = ascol.mehu()  # percent
+            temp, te_valid = ascol.mete()  # C
+            wind_speed, wi_valid = ascol.mews()  # m/s
+            precip, pr_valid = ascol.mepr()  # y/n
+            atm_pressure, ap_valid = ascol.meap()  # mbar
+            irradience, ir_valid = ascol.mepy()  # W/m2
+
+        status_str = (
+            "Meteorology status:\n"
+            f"    twilight [METW]  : {twilight:.2f} Lux [{tw_valid}]\n"
+            f"    humidity [MEHU]  : {humidity:03d} \% [{hu_valid}]\n"
+            f"    temperat. [METE] : {temp:.1f} C [{te_valid}]\n"
+            f"    wind speed [MEWS]: {wind_speed:.1f} m/s [{wi_valid}]\n"
+            f"    precip. [MEPR]   : {precip} [{pr_valid}]\n"
+            f"    atm. pres. [MEAP]: {atm_pressure:.2f} mbar [{ap_valid}]\n"
+            f"    irradience [MEPY]: {irradience:.2f} W/m2 [{ir_valid}]\n"
+        )
+        logger.info(status_str)
         return

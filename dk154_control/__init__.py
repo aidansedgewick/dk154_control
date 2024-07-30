@@ -30,3 +30,9 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("__init__")
+
+from dk154_control.api import DK154
+from dk154_control.tcs.ascol import Ascol
+from dk154_control.dfosc.dfosc import Dfosc
+from dk154_control.camera.ccd3 import Ccd3
+from dk154_control.lamps.wave_lamps import WaveLamps
