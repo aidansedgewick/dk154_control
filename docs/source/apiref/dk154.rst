@@ -1,0 +1,7 @@
+.. currentmodule:: dk154_control.api
+
+DK154 (convenience class)
+=========================
+
+.. autoclass:: DK154
+    :members:

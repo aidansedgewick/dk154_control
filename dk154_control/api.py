@@ -2,6 +2,7 @@ import time
 from logging import getLogger
 
 from astropy.coordinates import SkyCoord
+from astropy.time import Time
 
 from dk154_control.camera.ccd3 import Ccd3
 from dk154_control.tcs.ascol import Ascol
@@ -162,13 +163,12 @@ class DK154:
                 the NAME of the filter eg. 'Stromgr v', 'OIII', 'empty',
                 NOT ascol pos (eg '01', '02', '03'). Raises KeyError if unknown
                 filter (as defined in ``ascol.ascol_constants.WARP_CODES``)
-            wait_for_state (: )str or tuple of str, default="stopped"):
+            wait_for_state ()str or tuple of str, default="stopped"):
                 Wait for ``ascol.wars`` (Wheel A Read State) to be one of these state(s).
 
-        Returns
-        -------
-        res
-            The result of ``ascol.wars`` when it matches one of ``wait_for_state``.
+        Returns:
+            res (str):
+                The result of ``ascol.wars`` when it matches one of ``wait_for_state``.
 
         """
 
@@ -198,19 +198,17 @@ class DK154:
         """
         Move FASU B wheel to provided filter, and wait until FASU A state is 'stopped'
 
-        Parameters
-        ----------
-        wheel_b_filter
-            the NAME of the filter eg. 'U', 'B', 'V', 'R', 'I', 'empty',
-            NOT ascol pos (eg '01', '02', '03')
-            Raises KeyError if unknown filter (as defined in ``ascol.ascol_constants.WBRP_CODES``)
-        wait_for_state : str or tuple of str, default: "stopped"
-            Wait for ``ascol.wbrs`` (Wheel B Read State) to be one of these state(s).
+        Args:
+            wheel_b_filter:
+                the NAME of the filter eg. 'U', 'B', 'V', 'R', 'I', 'empty',
+                NOT ascol pos (eg '01', '02', '03')
+                Raises KeyError if unknown filter (as defined in ``ascol.ascol_constants.WBRP_CODES``)
+            wait_for_state (str or tuple of str, default: "stopped"):
+                Wait for ``ascol.wbrs`` (Wheel B Read State) to be one of these state(s).
 
-        Returns
-        -------
-        res
-            The result of ``ascol.wbrs`` when it matches one of ``wait_for_state``.
+        Returns:
+            res:
+                The result of ``ascol.wbrs`` when it matches one of ``wait_for_state``.
 
         """
 
@@ -244,10 +242,10 @@ class DK154:
         Move DFOSC grism wheel to the requested grism.
         Wait for
 
-        Parameters
-        ----------
-        dfosc_grism : str
-            The grism number (eg. '2')
+        Args:
+            dfosc_grism : str
+                The grism number (eg. '2')
+
 
 
         """
@@ -298,14 +296,31 @@ class DK154:
             dfosc.filter_goto(dfosc_f_pos)
         return
 
-    def take_science_exposure(
+    def take_science_frame(
         self,
         exposure_time: float,
         filename: str,
         object_name: str,
         read_wait=30.0,
     ):
+        """
+        Take a single science frame.
+        First, Ascol.shop("1") [SHutter OPen/close] is called to ensure shutter is open.
+        Then,
 
+        Args:
+            exposure_time (float):
+                The exposure time for CCD3, in seconds.
+            filename (str):
+                The filename to store the resulting output.
+                The file is likely stored in lin1:/data/YYYYMMDD/<filename>
+            object_name (str):
+                Stored in the FITS header under OBJECT
+            read_wait (float):
+                The amount of extra time to wait (after exposure_time sec),
+                before return.
+
+        """
         exp_params = {}
         exp_params["CCD3.exposure"] = str(exposure_time)
         exp_params["CCD3.IMAGETYP"] = "SCIENCE"
@@ -325,7 +340,7 @@ class DK154:
 
         with Ccd3(test_mode=self.test_mode) as ccd3:
             ccd3.set_exposure_parameters(exp_params)
-            ccd3.start_exposure(filename)
+            ccd3.start_exposure(str(filename))
 
             if not self.test_mode:
                 logger.info(f"wait {exposure_time}+1 sec for exposure")
@@ -337,19 +352,67 @@ class DK154:
             else:
                 logger.info("skip exp/read wait in test mode...")
 
-    def take_multi_science_exposure(
+    def take_science_multi_frames(
         self, exposure_time: float, object_name: str, n_exp: int, read_wait=30.0
     ):
+        """
+        Repeatedly call take_science_frame().
+        (take_science_frame() ensures shutter open, and records FASU A and B position in fits.)
+        Filenames will be named sequentially using object_name.
+
+        eg. for n_exp=3, object_name="M101", files are
+        "M101_001.fits", "M101_002.fits", "M101_003.fits"
+
+        Example:
+            >>> exptime = 30.0
+            >>> n_exp = 3
+            >>> object_name = "M83"
+            >>> with DK154() as dk154:
+            ...     dk154.take_science_multi_frame(exptime, object_name, n_exp)
+
+
+        Args:
+            exposure_time:
+
+
+        """
+
         for ii in range(1, n_exp + 1):
             filename = f"{object_name}_{ii:03d}.fits"
             self.take_science_exposure(
                 exposure_time, filename, object_name, read_wait=read_wait
             )
 
-    def take_dark_frames(self, exposure_time: float, n_exp: int, read_wait=30.0):
+    def take_dark_frames(
+        self, exposure_time: float, n_exp: int, dark_name=None, read_wait=30.0
+    ):
+        """
+        Take dark frames.
+        First calls Ascol.shop("0") to ensure shutter is closed.
+
+        files are named "<dark_name>_001.fits", "<dark_name>_002.fits",
+        and are likely stored in lin1:/data/YYMMDD/
+
+        Args:
+            exposure_time (float):
+                sec
+            n_exp:
+                Number of dark frames to take.
+            dark_name (str, optional):
+                If not provided, defaults to "dark_<date>UT", <date>=yymmdd_HHMMSS
+                (<date> is set at time of function call, so is fixed for all n_exp frames)
+
+
+
+        """
+
+        if dark_name is None:
+            t_now = Time.now()
+            t_str = t_now.strftime("%y%m%d_%H%M%S")
+            logger.info(f"dark_name defaults to {t_str}")
 
         exp_params = {}
-        exp_params["CCD.exposure"] = str(exposure_time)
+        exp_params["CCD3.exposure"] = str(exposure_time)
         exp_params["CCD3.IMAGETYP"] = "DARK"
         exp_params["CCD3.OBJECT"] = "DARK"
 
@@ -360,8 +423,20 @@ class DK154:
 
         with Ccd3(test_mode=self.test_mode) as ccd3:
             for ii in range(1, n_exp + 1):
-                filename = f"dark_{ii:03d}.fits"
+                filename = f"{dark_name}_{ii:03d}.fits"
                 ccd3.set_exposure_parameters(exp_params)
+
+                ccd3.start_exposure(str(filename))
+
+                if not self.test_mode:
+                    logger.info(f"wait {exposure_time}+1 sec for exposure")
+                    time.sleep(exposure_time + 1.0)
+                    ccd_status = ccd3.get_ccd_state()
+                    logger.info("CCD state: ccd_status")
+                    logger.info(f"wait {read_wait} sec for read")
+                    time.sleep(read_wait)
+                else:
+                    logger.info("skip exp/read wait in test mode...")
 
         raise NotImplementedError
 
