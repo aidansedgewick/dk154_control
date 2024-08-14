@@ -1,16 +1,16 @@
 from logging import getLogger
-
-from pysnmp.hlapi import (
-    getCmd,
-    setCmd,
-    SnmpEngine,
-    CommunityData,
-    UdpTransportTarget,
-    ContextData,
-    ObjectType,
-    ObjectIdentity,
-    Integer32,
-)
+from pysnmp.hlapi.asyncio.cmdgen import *
+#from pysnmp.hlapi import (
+#    getCmd,
+#    setCmd,
+#    SnmpEngine,
+#    CommunityData,
+#    UdpTransportTarget,
+#    ContextData,
+#    ObjectType,
+#    ObjectIdentity,
+#    Integer32,
+#)
 
 OUTLET_STATES = {
     "immediateOn": 1,

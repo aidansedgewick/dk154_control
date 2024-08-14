@@ -5,10 +5,6 @@ Python wrapper for low-level TCP-IP communication.
 
 Controls for the aperture/slits, filter, and grism wheels for DFOSC.
 Basic commands defined, and some additional start-up read-state commands for the various wheels.
-
-NOTE: These are not yet tested on ALFOSC, so it is not guaranteed that they work.
-
-TODO would it be easier to just have a library of grism, filter, and slit configurations at the beginning of this file?
 """
 
 import time
@@ -26,8 +22,6 @@ DFOSC commands for the MOXA
 These are the commands that are sent directly to the MOXA (figure out the IP & port).
 Includes aperture (slit), filter, and grism wheel commands.
 """
-# TODO - get the IP and port number for the MOXA
-
 
 def load_dfosc_setup(setup_path=None):
     setup_path = setup_path or Path(__file__).parent / "dfosc_setup.yaml"
@@ -59,8 +53,8 @@ class Dfosc:
     """
 
     INTERNAL_HOST = "192.168.132.58"
-    EXTERNAL_HOST = ""
-    MOXA_PORT = 4001  # TODO: get port number
+    EXTERNAL_HOST = ""  # No external host currently
+    MOXA_PORT = 4001
     LOCAL_HOST = "127.0.0.1"
     LOCAL_PORT = 8883  # Matches with MockDfoscServer
 
@@ -147,7 +141,7 @@ class Dfosc:
         Only to be used after a power failure/cycle or if the grism has been moved manually.
         """
         command = f"GI"
-        result_code, *dummy_values = self.get_data("GI")
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def gg(self, x: str):
@@ -177,10 +171,10 @@ class Dfosc:
     def gn(self, pos: str):
         """
         Goto one of the 8 positions (n*40000 steps), corresponds to centered aperture plate opening
-        n is a number 1-8 or 0-7
+        n is a number 1-8
         """
         if int(pos) not in range(8):  # range(8) incl. 0, excl, 8
-            msg = f"Grism has positions 0-7; provided: {pos}"
+            msg = f"Grism has positions 1-8; provided: {pos}"
             logger.warning(msg)
 
         command = f"G{pos}"
@@ -228,7 +222,7 @@ class Dfosc:
         wheel_ready = self.g()
         while wheel_ready != "y":
             logger.warning("grism wheel not ready")
-            time.sleep(2.0)
+            time.sleep(5.0)
             wheel_ready = self.g()
         return
 
@@ -281,10 +275,10 @@ class Dfosc:
     def an(self, position: str):
         """
         Aperture Goto one of the 8 positions (n*40000 steps), corresponds to centered aperture plate opening
-        n is a number 1-8 or 0-7
+        n is a number 1-8
         """
         if int(position) not in range(8):
-            msg = f"Aperture has positions 0-7; provided: {position}"
+            msg = f"Aperture has positions 1-8; provided: {position}"
             logger.warning(msg)
 
         command = f"A{position}"
@@ -333,7 +327,7 @@ class Dfosc:
         wheel_rdy = self.a()
         while wheel_rdy != "y":
             logger.warning("aperture wheel not ready")
-            time.sleep(2.0)
+            time.sleep(5.0)
             self.a()
         return
 
@@ -385,10 +379,10 @@ class Dfosc:
     def fn(self, position: str):
         """
         Filter Goto one of the 8 positions (n*40000 steps), corresponds to centered aperture plate opening
-        n is a number 1-8 or 0-7
+        n is a number 1-8
         """
         if int(position) not in range(8):
-            msg = f"Filter has positions 0-7; provided: {position}"
+            msg = f"Filter has positions 1-8; provided: {position}"
             logger.warning(msg)
 
         command = f"F{position}"

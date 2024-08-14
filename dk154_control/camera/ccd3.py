@@ -28,7 +28,7 @@ class Ccd3:
     INTERNAL_URL = "http://192.168.132.52:8889/"
     LOCAL_URL = "http://127.0.0.1:8889/"
     USER = "dk154"
-    _PASSWORD = "dk154"
+    PASSWORD = "dk154"
 
     EXPOSURE_SLEEP_BUFFER = 3.0
 
