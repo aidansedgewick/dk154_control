@@ -32,7 +32,7 @@ def take_flats(nframes, grism, slit, filter):
 	with df.Dfosc() as spec:
 
 		spec.gg(grisms[str(grism_pos)])
-		spec.ag(slits[str(slit_pos)]) # just to make sure the slit is aligned better than the current default
+		spec.ag(slits[str(slit_pos)])
 		spec.fg(filters[str(filter_pos)])
 		time.sleep(15)
 
