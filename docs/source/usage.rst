@@ -52,12 +52,12 @@ A typical command for moving the grism wheel, then reading the position of the w
 
 .. code-block:: python
 
-grisms = yaml.load(open('dk154_control/dfosc/dfosc_setup.yaml'), Loader=yaml.FullLoader)['grism']
+    grisms = yaml.load(open('dk154_control/dfosc/dfosc_setup.yaml'), Loader=yaml.FullLoader)['grism']
 
-    with Dfosc() as dfosc:
-        dfosc.gg(grisms['15'])
-        time.sleep(10)
-        dfosc.gp()
+        with Dfosc() as dfosc:
+            dfosc.gg(grisms['15'])
+            time.sleep(10)
+            dfosc.gp()
 
 Here, grism #15 is selected, and after some time the position of the grism wheel is read.
 
