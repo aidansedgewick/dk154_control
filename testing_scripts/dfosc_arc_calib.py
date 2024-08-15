@@ -1,12 +1,12 @@
 # script for taking n number of arc calibrations for various slit, grism, and filter combinations with DFOSC
-# useage: calibArc.py [grism] [slit] [filter]
+# useage: dfosc_arc_calib.py --grism [grism] --slit [slit] --filter [filter]
 # grism slit and filter are given either as either one number or multiple numbers separated by commas
-# example: calibArc.py --grism 1 2 3 4 5 6 7 8 --slit 1 2 3 4 5 6 7 8 --filter 1 2 3 4 5 6 7 8
+# example: dfosc_arc_calib.py --grism 1 2 3 4 5 6 7 8 --slit 1 2 3 4 5 6 7 8 --filter 1 2 3 4 5 6 7 8
 # position 1 is empty for all wheels
 # here the inputs are given as the positions of the wheels (see dfosc_setup.json for correct arrangement)
 
 # only grism 15 should be used with a filter, for all other grisms, filter should be 0
-# ex. calibArc.py 15 1,2,3,4 4,5,6  (here filters 4,5,6 have different cross dispersers in place)
+# ex. dfosc_arc_calib.py 15 1,2,3,4 4,5,6  (here filters 4,5,6 have different cross dispersers in place)
 
 # WARNING: Check that lamps have been turned on/off. This can also be bone through the lin 55 machine using:
 # python3 dk154_control/cyberpower_pdu_snmp/__init__.py 192.168.132.59 5 on
