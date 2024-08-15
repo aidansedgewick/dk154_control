@@ -4,6 +4,7 @@ import time
 from dk154_control.camera.ccd3 import Ccd3
 from dk154_control.tcs.ascol import Ascol
 
+#Directly connect to dfosc and send commands via telnet terminal
 host = '192.168.132.58'
 port = 4001
 
