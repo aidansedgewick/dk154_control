@@ -18,7 +18,7 @@
 
 import telnetlib
 import time
-import dk154_control.lamp as lamp
+import dk154_control.lamp as lamp  #TODO: chck current naming convention on .55 machine 
 from argparse import ArgumentParser
 from logging import getLogger
 from dk154_control.camera.ccd3 import Ccd3

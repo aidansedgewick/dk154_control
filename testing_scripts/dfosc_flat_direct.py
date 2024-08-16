@@ -318,4 +318,3 @@ if __name__ == '__main__':
         take_flat_empty(args.nframes, args.slit, args.filt)       
     else:
         print('Grism position out of range, must be 1-8')
-        exit(1)
