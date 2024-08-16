@@ -39,6 +39,7 @@ if __name__ == "__main__":
         logger.info("test A (aperture wheel ready)")
         try:
             ready = dfosc.ai()
+            ready
             logger.info(f"DFOSC aperture wheel initialized: {ready}")
         except Exception as e:
             print(e)
@@ -49,6 +50,7 @@ if __name__ == "__main__":
         logger.info("test F (filter wheel ready)")
         try:
             ready = dfosc.fi()
+            ready
             logger.info(f"DFOSC filter wheel initialized: {ready}")
         except Exception as e:
             print(e)
@@ -57,8 +59,7 @@ if __name__ == "__main__":
         time.sleep(40)
         print("Wating 40 seconds for wheels to initialize")
 
-"""
+
         print("Current Grism position:", dfosc.gp() )
         print("Current Aperture position:", dfosc.ap() )
         print("Current Filter position:", dfosc.fp() )
-"""
