@@ -1,7 +1,9 @@
 # script for taking n number of flats for various slit, grism, and filter combinations with DFOSC
-# useage: dfosc_flats.py [nframes] [grism] [slit] [filter]
-# grism slit and filter are given either as either one number or multiple numbers separated by commas
-# example: dfosc_flats.py 4 3,5,6,8,14,15 1,1.5,2,2.5 0
+# useage: 011_test_dfosc_flats.py -n [nframes] -g [grism] -s [slit] -f [filter]
+# grism slit and filter are given either as either one number or multiple numbers separated by a space
+# script loops over all selected grism, slit, and filter combinations 
+# it takes n number of flats for each orientation
+# example: 011_test_dfosc_flats.py -n 4 -g 3 5 6 8 14 15 -s 1 1.5 2 2.5 -f 0
 
 # import necessary packages
 import dk154_control.dfosc.dfosc as df
@@ -51,33 +53,33 @@ def take_flats(nframes, grism, slit, filter):
 		print(f'Filter position: {fr_pos}')
 
 	# take the flats
+	ccd3 = Ccd3()
+	# set the exposure parameters
+	exp_params = {}
+	exp_params['CCD3.exposure'] = str(exp_time)
+	exp_params['CCD3.IMAGETYP'] = exp_type
+	exp_params['CCD3.OBJECT'] = obj_name
+	exp_params['WASA.filter'] = "0"
+	exp_params['WASB.filter'] = "0"
+	
+	ccd3.set_exposure_parameters(params=exp_params)
+		
 	with Ascol() as ascol:
-		ccd3 = Ccd3()
-
-		# set the exposure parameters
-		exp_params = {}
-		exp_params['CCD3.exposure'] = str(exp_time)
-		exp_params['CCD3.IMAGETYP'] = str(exp_type)
-		exp_params['CCD3.OBJECT'] = str(obj_name)
-		exp_params['WASA.filter'] = "0"
-		exp_params['WASB.filter'] = "0"
-		
-		ccd3.set_exposure_parameters(params=exp_params)
-		
-		ascol.shop('0')
-		ccd3.set_exposure_parameters(params=exp_params)
-		ccd3.start_exposure()
-		time.sleep(exp_time + 30)
+		for ii in range(nframes):
+			filename = f'FLAT_g{grism}_s{slit}_f{filter}_{ii:03d}.fits'
+			ascol.shop('0')
+			ccd3.set_exposure_parameters(params=exp_params)
+			ccd3.start_exposure(filename)
+			time.sleep(exp_time + 30)
 
 	
 if __name__ == '__main__':
 	# define the parser
 	parser = ArgumentParser(description='Take calibration flats with DFOSC, see dfosc_setup.json for expected grism, slit, and filter positions')
-	parser.add_argument('-n', type=int, help='Number of frames to take')
-	parser.add_argument('-g', type=str, choices= dfosc_setup['grism'].keys() ) 
-	parser.add_argument('-s', type=str, choices= dfosc_setup['slit'].keys() ) 
-	parser.add_argument('-f', type=str, choices= dfosc_setup['filter'].keys() )
-	#TODO: update filter list when filters are added
+	parser.add_argument('-n','--nframes', nargs='+' , type=int, help='Number of frames to take')
+	parser.add_argument('-g','--grism', nargs='+',type=str, choices= dfosc_setup['grism'].keys() ) 
+	parser.add_argument('-s','--slit' ,nargs='+' ,type=str, choices= dfosc_setup['slit'].keys() ) 
+	parser.add_argument('-f', '--filter',nargs='+',type=str, choices= dfosc_setup['filter'].keys() )
 	args = parser.parse_args()
 	
 	frames = args.n

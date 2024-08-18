@@ -18,7 +18,7 @@
 
 import telnetlib
 import time
-import dk154_control.lamp as lamp  #TODO: chck current naming convention on .55 machine 
+import dk154_control.lamp as lamp  #TODO: check current naming convention on .55 machine 
 from argparse import ArgumentParser
 from logging import getLogger
 from dk154_control.camera.ccd3 import Ccd3
@@ -126,7 +126,7 @@ if __name__ == '__main__':
     # define the parser
     parser = ArgumentParser(description='Take arc calibration images with DFOSC')
     parser.add_argument('--grism',nargs= '+',help='Grism position(s) to use, 1-8, or multiple grism positions')
-    parser.add_argument('--slit', nargs='+' ,help='Slit position(s) to use, 1-8, or multiple slit positions')
+    parser.add_argument('--slit', nargs= '+' ,help='Slit position(s) to use, 1-8, or multiple slit positions')
     parser.add_argument('--filt', nargs = '+',help='Filter position(s) to use, 1-8, or multiple filter positions')
     args = parser.parse_args()
     take_arc_calib(args.grism, args.slit, args.filt)

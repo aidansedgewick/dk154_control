@@ -23,14 +23,14 @@ def take_arc_calib(grism,slit,filt):
                     dfosc.grism_goto(dfosc_setup['grism'][g])
                     dfosc.aperture_goto(dfosc_setup['slit'][s])
                     dfosc.filter_goto(dfosc_setup['filter'][f])
-
-                    if g == '2' or g=='5' or g== '7' or g== '8':
+                    # TODO: see if the exposure times are valid for 1.0" slit
+                    if g == '3' or g=='7' or g== '14' or g== '15':
                         exp_time = 10
-                    elif g == '3':
+                    elif g == '5':
                         exp_time = 40
-                    elif g == '4':
-                        exp_time = 20
                     elif g == '6':
+                        exp_time = 20
+                    elif g == '8':
                         exp_time = 150
 
                     exp_params = {}

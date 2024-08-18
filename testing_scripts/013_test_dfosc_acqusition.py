@@ -42,19 +42,15 @@ if __name__ == "__main__":
             dfosc.grism_goto(0)
             dfosc.filter_goto(0)
 
-            if slit != 0:
-                logger.info(f"Grism and slit in positions - G: {grism} , S: {slit}")
-                decision = input("test \033[032;1mMove Grism and Slit to empty Position?\033[0m - [y/n]: ")
-                if decision=="y":
-                    logger.info("move slit wheel to empty positions")
-                    dfosc.ag(0)
-                    time.sleep(15)
-                    imgtpe = 'OBJECT'
+            if slit == 0:
+                input("test \033[032;1mSlit in empty position\033[0m - press enter: ")
+                logger.info(f"Slit wheel in position: empty")
+                imgtpe = 'OBJECT'
 
-                else:
-                    input("test \033[032;1mSlit in position\033[0m - press enter: ")
-                    logger.info(f"Slit wheel in position: {slit}")
-                    imgtpe = 'OBJECT,SLIT'
+            else:
+                input("test \033[032;1mSlit in position\033[0m - press enter: ")
+                logger.info(f"Slit wheel in position: {slit}")
+                imgtpe = 'OBJECT,SLIT'
 
             if mag < 10:
                 exp_time = 10
