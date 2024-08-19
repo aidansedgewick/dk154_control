@@ -55,6 +55,16 @@ if __name__ == "__main__":
         logger.info(f"dome state = {dome_state}")
         print("\n\n\n")
 
+        input("\033[32;1mCLOSE mirror flap (FMOP)\033[0m- press enter: ")
+        mirror_state = ascol.fmrs()
+        logger.info(f"mirror flap state: {mirror_state}")
+        fmop_result = ascol.fmop("0")
+        logger.info(f"FMOP result: {fmop_result}")
+        mirror_state = ascol.fmrs()
+        logger.info(f"mirror flap state: {mirror_state}")
+        require_next(ascol)
+        print("\n\n\n")
+
         input("\033[32;1mCLOSE casssegrain flap (FCOP)\033[0m - press enter: ")
         cass_state = ascol.fcrs()
         logger.info(f"casseg. flap state: {cass_state}")
@@ -64,16 +74,6 @@ if __name__ == "__main__":
         logger.info(f"casseg. flap state: {cass_state}")
         dome_state = ascol.dors()
         require_next(ascol)  # User must confirm status is OK before next step.
-        print("\n\n\n")
-
-        input("\033[32;1mCLOSE mirror flap (FMOP)\033[0m- press enter: ")
-        mirror_state = ascol.fmrs()
-        logger.info(f"mirror flap state: {mirror_state}")
-        fmop_result = ascol.fmop("0")
-        logger.info(f"FMOP result: {fmop_result}")
-        mirror_state = ascol.fmrs()
-        logger.info(f"mirror flap state: {mirror_state}")
-        require_next(ascol)
         print("\n\n\n")
 
         input("\033[32;1mPARK telescope (TEPA)\033[0m - press enter: ")
