@@ -88,6 +88,43 @@ print("CCD state after exposure: {ccd_state}")
 
 ```
 
+### Interacting with DFOSC
+
+Use the `Dfosc` class. eg.
+
+```
+from dk154_control.dfosc.dfosc import Dfosc
+import yaml
+
+dfosc_setup = yaml.load(open('dk154_control/dfosc/dfosc_setup.yaml'), Loader=yaml.FullLoader)
+
+with Dfosc() as dfosc:
+    dfosc.grism_goto(dfosc_setup[grism]['empty']) # move grism wheel into 'empty' position
+    dfosc.aperture_goto(dfosc_setup[slit]['1.5']) # move aperture wheel to 1.5" slit
+    dfosc.filter_goto(dfosc_setup[filter]['empty0']) # move filter wheel to first empty position
+
+    grism_pos = dfosc.gp()
+    slit_pos = dfosc.ap()
+    filter_pos = dfosc.fp()
+
+    # print step positions of the wheels
+    print(f'Grism position: {grism_pos}')
+    print(f'Aperture position: {slit_pos}')
+    print(f'Filter position: {filter_pos})  
+```
+#### Calibration Lamps
+
+Use the `WaveLamps` class. eg.
+
+```
+from dk154_control.lamps.wave_lamps import WaveLamps
+
+lamps = WaveLamps()
+lamps.turn_on_lamps()
+time.sleep(30) # let the lamps warm up/turn on completely
+lamps.turn_off_lamps()
+```
+
 ### Running test scripts
 
 There are a handful of test scripts in test scripts.
