@@ -1,6 +1,8 @@
+import asyncio
+
 from logging import getLogger
 
-from pysnmp.hlapi import (
+from pysnmp.hlapi.v3arch.asyncio import (
     getCmd,
     setCmd,
     SnmpEngine,
@@ -58,6 +60,12 @@ class WaveLamps:
         if isinstance(outlets, int):
             outlets = tuple(outlets)  # So can loop through them later...
         self.outlets = outlets
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        pass
 
     def set_outlet(self, outlet: int, state: int):
 

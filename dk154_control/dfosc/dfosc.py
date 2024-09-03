@@ -232,18 +232,23 @@ class Dfosc:
             wheel_ready = self.g()
         return
 
-    def grism_goto(self, position: str, N_tries=24, sleep_time=5.0):
+    def grism_wait(self, func, N_tries=24, sleep_time=5.0):
+        for ii in range(N_tries):
+            grism_ready = func() #self.g()
+            if grism_ready == "y":
+                return
+            time.sleep(sleep_time)
+        raise DfoscError(f"DFOSC grism wheel not ready after {N_tries}")
+
+    def grism_goto(self, position: str, ):
         """
         Grism Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
         """
-        for ii in range(N_tries):
-            filter_ready = self.a()
-            if filter_ready == "y":
-                logger.info(f"filter ready: move to {position}")
-                result = self.ag(position)
-                return result
-            time.sleep(sleep_time)
-        raise DfoscError(f"DFOSC grism wheel not ready after {N_tries}")
+        self.grism_wait()
+        logger.info(f"filter ready: move to {position}")
+        result = self.gg(position)
+        self.grism_wait()
+        return
 
     def ai(self):
         """
@@ -342,8 +347,8 @@ class Dfosc:
         Aperture Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
         """
         for ii in range(N_tries):
-            filter_ready = self.a()
-            if filter_ready == "y":
+            aperture_ready = self.a()
+            if aperture_ready == "y":
                 logger.info(f"filter ready: move to {position}")
                 result = self.ag(position)
                 return result
