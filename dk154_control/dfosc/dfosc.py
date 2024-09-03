@@ -5,10 +5,6 @@ Python wrapper for low-level TCP-IP communication.
 
 Controls for the aperture/slits, filter, and grism wheels for DFOSC.
 Basic commands defined, and some additional start-up read-state commands for the various wheels.
-
-NOTE: These are not yet tested on ALFOSC, so it is not guaranteed that they work.
-
-TODO would it be easier to just have a library of grism, filter, and slit configurations at the beginning of this file?
 """
 
 import time
@@ -26,8 +22,6 @@ DFOSC commands for the MOXA
 These are the commands that are sent directly to the MOXA (figure out the IP & port).
 Includes aperture (slit), filter, and grism wheel commands.
 """
-# TODO - get the IP and port number for the MOXA
-
 
 def load_dfosc_setup(setup_path=None):
     setup_path = setup_path or Path(__file__).parent / "dfosc_setup.yaml"
@@ -59,8 +53,8 @@ class Dfosc:
     """
 
     INTERNAL_HOST = "192.168.132.58"
-    EXTERNAL_HOST = ""
-    MOXA_PORT = 4001  # TODO: get port number
+    EXTERNAL_HOST = ""  # No external host currently
+    MOXA_PORT = 4001
     LOCAL_HOST = "127.0.0.1"
     LOCAL_PORT = 8883  # Matches with MockDfoscServer
 
@@ -147,7 +141,7 @@ class Dfosc:
         Only to be used after a power failure/cycle or if the grism has been moved manually.
         """
         command = f"GI"
-        result_code, *dummy_values = self.get_data("GI")
+        result_code, *dummy_values = self.get_data(command)
         return result_code
 
     def gg(self, x: str):
@@ -177,10 +171,10 @@ class Dfosc:
     def gn(self, pos: str):
         """
         Goto one of the 8 positions (n*40000 steps), corresponds to centered aperture plate opening
-        n is a number 1-8 or 0-7
+        n is a number 1-8
         """
         if int(pos) not in range(8):  # range(8) incl. 0, excl, 8
-            msg = f"Grism has positions 0-7; provided: {pos}"
+            msg = f"Grism has positions 1-8; provided: {pos}"
             logger.warning(msg)
 
         command = f"G{pos}"
@@ -224,27 +218,30 @@ class Dfosc:
         Grism wheel initialize
         """
         self.gi()
-        time.sleep(5.0)
-        wheel_ready = self.g()
-        while wheel_ready != "y":
-            logger.warning("grism wheel not ready")
-            time.sleep(2.0)
-            wheel_ready = self.g()
+        self.grism_wait()
         return
 
-    def grism_goto(self, position: str, N_tries=24, sleep_time=5.0):
+    def grism_wait(self, N_tries=24, sleep_time=5.0):
         """
-        Grism Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
+        Wait for grism wheel to be ready
         """
         for ii in range(N_tries):
-            filter_ready = self.a()
-            if filter_ready == "y":
-                logger.info(f"filter ready: move to {position}")
-                result = self.ag(position)
-                return result
+            grism_ready = self.g()
+            if grism_ready == "y":
+                logger.info("grism wheel ready")
+                return
             time.sleep(sleep_time)
         raise DfoscError(f"DFOSC grism wheel not ready after {N_tries}")
 
+    def grism_goto(self, position: str):
+        """
+        Grism Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
+        """
+        self.grism_wait()
+        result = self.gg(position)
+        self.grism_wait()
+        return result
+    
     def ai(self):
         """
         Aperture Initialize position to hall switch and aperture_zero offset
@@ -281,10 +278,10 @@ class Dfosc:
     def an(self, position: str):
         """
         Aperture Goto one of the 8 positions (n*40000 steps), corresponds to centered aperture plate opening
-        n is a number 1-8 or 0-7
+        n is a number 1-8
         """
         if int(position) not in range(8):
-            msg = f"Aperture has positions 0-7; provided: {position}"
+            msg = f"Aperture has positions 1-8; provided: {position}"
             logger.warning(msg)
 
         command = f"A{position}"
@@ -328,27 +325,29 @@ class Dfosc:
         Aperture initialize
         """
         self.ai()
-
-        time.sleep(5.0)
-        wheel_rdy = self.a()
-        while wheel_rdy != "y":
-            logger.warning("aperture wheel not ready")
-            time.sleep(2.0)
-            self.a()
+        self.aperture_wait()
         return
+    
+    def aperture_wait(self, N_tries=24, sleep_time=5.0):
+        """
+        Wait for aperture wheel to be ready
+        """
+        for ii in range(N_tries):
+            aperture_ready = self.a()
+            if aperture_ready == "y":
+                logger.info("aperture wheel ready")
+                return
+            time.sleep(sleep_time)
+        raise DfoscError(f"DFOSC aperture wheel not ready after {N_tries}")
 
-    def aperture_goto(self, position: str, N_tries=30, sleep_time=5.0):
+    def aperture_goto(self, position: str):
         """
         Aperture Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
         """
-        for ii in range(N_tries):
-            filter_ready = self.a()
-            if filter_ready == "y":
-                logger.info(f"filter ready: move to {position}")
-                result = self.ag(position)
-                return result
-            time.sleep(sleep_time)
-        raise DfoscError(f"DFOSC aperture wheel not ready after {N_tries}")
+        self.aperture_wait()
+        result = self.ag(position)
+        self.aperture_wait()
+        return result
 
     def fi(self):
         """
@@ -385,10 +384,10 @@ class Dfosc:
     def fn(self, position: str):
         """
         Filter Goto one of the 8 positions (n*40000 steps), corresponds to centered aperture plate opening
-        n is a number 1-8 or 0-7
+        n is a number 1-8
         """
         if int(position) not in range(8):
-            msg = f"Filter has positions 0-7; provided: {position}"
+            msg = f"Filter has positions 1-8; provided: {position}"
             logger.warning(msg)
 
         command = f"F{position}"
@@ -432,25 +431,29 @@ class Dfosc:
         Filter wheel initialize
         """
         self.fi()
-        time.sleep(5.0)
-        while self.f() != "y":
-            logger.warning("Filter Wheel Not Ready")
-            time.sleep(2.0)
+        self.filter_wait()
         return
 
-    def filter_goto(self, position: str, N_tries=30, sleep_time=5.0):
+    def filter_wait(self, N_tries=24, sleep_time=5.0):
         """
-        Filter Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
+        Wait for filter wheel to be ready
         """
-
         for ii in range(N_tries):
             filter_ready = self.f()
             if filter_ready == "y":
-                logger.info(f"filter ready: move to {position}")
-                result = self.fg(position)
-                return result
+                logger.info("filter wheel ready")
+                return
             time.sleep(sleep_time)
         raise DfoscError(f"DFOSC filter wheel not ready after {N_tries}")
+
+    def filter_goto(self, position: str):
+        """
+        Filter Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
+        """
+        self.filter_wait()
+        result = self.fg(position)
+        self.filter_wait()
+        return result
 
     def log_all_status(self):
         grism_ready = self.g()
