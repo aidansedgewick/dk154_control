@@ -1,6 +1,8 @@
+import asyncio
+
 from logging import getLogger
-from pysnmp.hlapi.asyncio.cmdgen import *
-from pysnmp.hlapi import (
+
+from pysnmp.hlapi.v3arch.asyncio import (
     getCmd,
     setCmd,
     SnmpEngine,
@@ -61,7 +63,7 @@ class WaveLamps:
 
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_value, traceback):
         pass
 
