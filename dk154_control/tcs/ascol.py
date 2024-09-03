@@ -251,7 +251,8 @@ class Ascol:
         GLobal LoGin [ASCOL 2.2]
 
         Args:
-            password (str, default: "****"): Send this string as the password to the server.
+            password (str, default: "****"): 
+                Send this string as the password to the server.
                 You will likely never need to provide this.
 
         Returns:

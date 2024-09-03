@@ -4,3 +4,4 @@ DFOSC (Danish Faint Object Spectrograph and Camera)
 ===================================================
 
 .. autoclass:: Dfosc
+    :members:

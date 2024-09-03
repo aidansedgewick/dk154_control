@@ -88,6 +88,43 @@ print("CCD state after exposure: {ccd_state}")
 
 ```
 
+### Interacting with DFOSC
+
+Use the `Dfosc` class. eg.
+
+```
+from dk154_control.dfosc.dfosc import Dfosc
+import yaml
+
+dfosc_setup = yaml.load(open('dk154_control/dfosc/dfosc_setup.yaml'), Loader=yaml.FullLoader)
+
+with Dfosc() as dfosc:
+    dfosc.grism_goto(dfosc_setup[grism]['empty']) # move grism wheel into 'empty' position
+    dfosc.aperture_goto(dfosc_setup[slit]['1.5']) # move aperture wheel to 1.5" slit
+    dfosc.filter_goto(dfosc_setup[filter]['empty0']) # move filter wheel to first empty position
+
+    grism_pos = dfosc.gp()
+    slit_pos = dfosc.ap()
+    filter_pos = dfosc.fp()
+
+    # print step positions of the wheels
+    print(f'Grism position: {grism_pos}')
+    print(f'Aperture position: {slit_pos}')
+    print(f'Filter position: {filter_pos})  
+```
+#### Calibration Lamps
+
+Use the `WaveLamps` class. eg.
+
+```
+from dk154_control.lamps.wave_lamps import WaveLamps
+
+lamps = WaveLamps()
+lamps.turn_on_lamps()
+time.sleep(30) # let the lamps warm up/turn on completely
+lamps.turn_off_lamps()
+```
+
 ### Running test scripts
 
 There are a handful of test scripts in test scripts.
@@ -131,6 +168,32 @@ If so - uncomment OPEN SHUTTER and CLOSE SHUTTER lines in this script...
 
 test meteorology instrument commands.
 
+#### 007_test_convenience.py
+
+TBW
+
+#### 008_test_dfosc_wheels.py
+
+Checks if DFOSC wheels are ready, and returns their current positions
+
+#### 010_test_dfosc_init.py
+
+Initializes all the DFOSC wheels, and waits 40 seconds for a compete rotation to occur. Initializing the wheels should be done after a power outage/reset.
+
+#### 011_test_dfosc_flats.py
+
+Script for taking sky flats. 
+Useage: python3 testing_scripts/011_test_dfosc_flats.py -n [nframes] -g [grism] -s [slit] -f [filter]
+The script will loop through selected grism, slit, and filter orientations, and take the specified number of frames per position.
+
+#### 012_test_dfosc_arc.py
+
+Script for running through various arc calibration frames. Hg lamps will turn on at the start, and the user specified grisms, slits, and filters will be looped through, then the lamps will turn off. It is recommended to run this script once for many orientations rather than multiple times. For all slit/grism positions (and empty filter position), this will take around 90 minutes to run through. Example: python3 testing_scripts/012_test_dfosc_arc.py -g 3 5 6 7 8 14 15 -s 1.0 1.5 2.0 2.5 3.0 5.0 -f empty0
+
+#### 013_test_dfosc_acquisition.py
+
+Take an acquisition frame with slit in place, without a grism. Take for bright targets 10 < mag < 15 (used to check object alignment in slit). Example: python3 testing_scripts/013_test_dfosc_acquisition.py -s 2.5 -m 13
+
 #### 101_status_loop.py
 
 loop every 'n' seconds, log results from a set of status commands.
@@ -144,6 +207,17 @@ loop every 'n' seconds, log results from a set of status commands.
     
 *guide only* - unsure exactly what commands are needed to fully/safely shutdown telescope.
 
+#### dfosc_flat_direct.py
+
+Similar to 011_test_dfosc_flats.py expect it connects to dfosc directly (without Dfosc class).
+
+#### dfosc_target_acq.py
+
+Similar to 013_test_dfosc_acquisition.py except it connects directly via telnet. 
+
+#### dfosc_arc_calib.py
+
+Script used to directly connect to dfosc, and the cyberpowerbar. Similar to 012_test_dfosc_arc.py except it bypasses the conventions used by Dfosc, and WaveLamp classes. See comments in script. 
 
 ### Mock telescope interactions
 
