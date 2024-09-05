@@ -63,7 +63,7 @@ class Ascol:
     ASCOL_PORT = (
         2003  # Same port used by the server, ports avail 2001-2009, 2007 is occupied
     )
-    LOCAL_PORT = 8888  # Alt-HTTP port -- safe to use?
+    LOCAL_PORT = 8883  # Alt-HTTP port -- safe to use?
     _GLOBAL_PASSWORD = "1178"
 
     def __init__(
@@ -251,7 +251,7 @@ class Ascol:
         GLobal LoGin [ASCOL 2.2]
 
         Args:
-            password (str, default: "****"): 
+            password (str, default: "****"):
                 Send this string as the password to the server.
                 You will likely never need to provide this.
 

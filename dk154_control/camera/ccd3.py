@@ -26,7 +26,7 @@ EXPECTED_PARAMETERS = (
 class Ccd3:
     EXTERNAL_URL = "http://134.171.81.78:/8889/"
     INTERNAL_URL = "http://192.168.132.52:8889/"
-    LOCAL_URL = "http://127.0.0.1:8889/"
+    LOCAL_URL = "http://127.0.0.1:8884/"
     USER = "dk154"
     PASSWORD = "dk154"
 

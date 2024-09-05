@@ -23,6 +23,7 @@ These are the commands that are sent directly to the MOXA (figure out the IP & p
 Includes aperture (slit), filter, and grism wheel commands.
 """
 
+
 def load_dfosc_setup(setup_path=None):
     setup_path = setup_path or Path(__file__).parent / "dfosc_setup.yaml"
     with open(setup_path, "r") as f:
@@ -56,7 +57,7 @@ class Dfosc:
     EXTERNAL_HOST = ""  # No external host currently
     MOXA_PORT = 4001
     LOCAL_HOST = "127.0.0.1"
-    LOCAL_PORT = 8883  # Matches with MockDfoscServer
+    LOCAL_PORT = 8885  # Matches with MockDfoscServer
 
     def __init__(self, test_mode=False, debug=False, external=False):
 
@@ -241,7 +242,7 @@ class Dfosc:
         result = self.gg(position)
         self.grism_wait()
         return result
-    
+
     def ai(self):
         """
         Aperture Initialize position to hall switch and aperture_zero offset
@@ -327,7 +328,7 @@ class Dfosc:
         self.ai()
         self.aperture_wait()
         return
-    
+
     def aperture_wait(self, N_tries=24, sleep_time=5.0):
         """
         Wait for aperture wheel to be ready

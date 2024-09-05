@@ -234,13 +234,10 @@ class DK154:
             ascol.wait_for_result(ascol.wbrs, expected_result=wait_for_state)
         return
 
-    def move_dfosc_grism_and_wait(
-        self,
-        dfosc_grism: str,
-    ):
+    def move_dfosc_grism_and_wait(self, dfosc_grism: str):
         """
         Move DFOSC grism wheel to the requested grism.
-        Wait for
+        Waits for the DFOSC grism wheel to move to the correct location.
 
         Args:
             dfosc_grism : str
@@ -268,7 +265,16 @@ class DK154:
             dfosc.grism_goto(dfosc_g_pos)
         return
 
-    def move_dfosc_slit_and_wait(self, dfosc_slit: str, wait_for_state="y"):
+    def move_dfosc_slit_and_wait(self, dfosc_slit: str):
+        """
+        Move DFOSC slit/aperture wheel to the requested grism.
+        Waits for the DFOSC alit wheel to move to the correct location.
+
+        Args:
+            dfosc_slit : str
+                The slit name (eg. '1.0')
+
+        """
         dfosc_s_pos = DFOSC_SLIT_LOOKUP.get(dfosc_slit, None)
 
         if dfosc_s_pos is None:
@@ -282,7 +288,16 @@ class DK154:
             dfosc.aperture_goto(dfosc_s_pos)
         return
 
-    def move_dfosc_filter_and_wait(self, dfosc_filter: str, wait_for_state="y"):
+    def move_dfosc_filter_and_wait(self, dfosc_filter: str):
+        """
+        Move DFOSC slit/aperture wheel to the requested grism.
+        Waits for the DFOSC alit wheel to move to the correct location.
+
+        Args:
+            dfosc_filter : str
+                The filter name (eg. 'empty')
+
+        """
         dfosc_f_pos = DFOSC_FILTER_LOOKUP.get(dfosc_filter, None)
 
         if dfosc_f_pos is None:
@@ -301,12 +316,15 @@ class DK154:
         exposure_time: float,
         filename: str,
         object_name: str,
+        exposure_wait=True,
         read_wait=30.0,
     ):
         """
         Take a single science frame.
         First, Ascol.shop("1") [SHutter OPen/close] is called to ensure shutter is open.
-        Then,
+        Then, call CCD3 to save to <filename>
+        Optionally wait <exposure_time>+1 seconds.
+        Wait for <read_wait> seconds (for CCD3 to read out).
 
         Args:
             exposure_time (float):
@@ -316,9 +334,10 @@ class DK154:
                 The file is likely stored in lin1:/data/YYYYMMDD/<filename>
             object_name (str):
                 Stored in the FITS header under OBJECT
-            read_wait (float):
-                The amount of extra time to wait (after exposure_time sec),
-                before return.
+            exposure_wait (bool, default=True):
+                If true, wait for <exposure_time>+1. seconds.
+            read_wait (float, default=30.0):
+                How long to wait (in seconds) after exposure for CCD to read?
 
         """
         exp_params = {}
@@ -341,16 +360,25 @@ class DK154:
         with Ccd3(test_mode=self.test_mode) as ccd3:
             ccd3.set_exposure_parameters(exp_params)
             ccd3.start_exposure(str(filename))
+            time.sleep(1.0)
+            ccd_status = ccd3.get_ccd_state()
+        logger.info(f"CCD state: {ccd_status}")
 
-            if not self.test_mode:
+        if not self.test_mode:
+            if exposure_wait:
                 logger.info(f"wait {exposure_time}+1 sec for exposure")
                 time.sleep(exposure_time + 1.0)
+            with Ccd3(test_mode=self.test_mode) as ccd3:
                 ccd_status = ccd3.get_ccd_state()
-                logger.info("CCD state: ccd_status")
+            logger.info(f"CCD state: {ccd_status}")
+            if read_wait:
                 logger.info(f"wait {read_wait} sec for read")
                 time.sleep(read_wait)
-            else:
-                logger.info("skip exp/read wait in test mode...")
+                with Ccd3(test_mode=self.test_mode) as ccd3:
+                    ccd_status = ccd3.get_ccd_state()
+                logger.info(f"CCD state: {ccd_status}")
+        else:
+            logger.info("skip exp/read wait in test mode...")
 
     def take_science_multi_frames(
         self, exposure_time: float, object_name: str, n_exp: int, read_wait=30.0
@@ -372,8 +400,15 @@ class DK154:
 
 
         Args:
-            exposure_time:
-
+            exposure_time (float):
+                The exposure time for CCD3, in seconds.
+            object_name (str):
+                Will be used in output file names.
+                The files are likely stored in lin1:/data/YYYYMMDD/<filename>
+            n_exp (int):
+                How many repeat exposures?
+            read_wait (float, default=30.0):
+                How long to wait (in seconds) after exposure for CCD to read?
 
         """
 
@@ -395,13 +430,16 @@ class DK154:
 
         Args:
             exposure_time (float):
-                sec
+                The exposure time for CCD3, in seconds.
             n_exp:
                 Number of dark frames to take.
             dark_name (str, optional):
                 If not provided, defaults to "dark_<date>UT", <date>=yymmdd_HHMMSS
                 (<date> is set at time of function call, so is fixed for all n_exp frames)
-
+            exposure_wait (bool, default=True):
+                If true, wait for <exposure_time>+1. seconds.
+            read_wait (float, default=30.0):
+                How long to wait (in seconds) after exposure for CCD to read?
 
 
         """
@@ -437,8 +475,6 @@ class DK154:
                     time.sleep(read_wait)
                 else:
                     logger.info("skip exp/read wait in test mode...")
-
-        raise NotImplementedError
 
     def switch_lamps_on(self):
         raise NotImplementedError
