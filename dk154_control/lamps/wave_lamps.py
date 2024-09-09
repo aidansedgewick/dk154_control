@@ -84,7 +84,7 @@ class WaveLamps:
 
         oid = ObjectIdentity(f"{self.ePDUOutletControlOutletCommand}.{outlet}")
 
-        errorIndication, errorStatus, errorIndex, varBinds = next(
+        errorIndication, errorStatus, errorIndex, varBinds = asyncio.run(
             setCmd(
                 SnmpEngine(),
                 CommunityData("private"),
@@ -103,7 +103,7 @@ class WaveLamps:
 
         oid = ObjectIdentity(f"{self.ePDUOutletControlOutletCommand}.{outlet}")
 
-        errorIndication, errorStatus, errorIndex, varBinds = next(
+        errorIndication, errorStatus, errorIndex, varBinds = asyncio.run(
             getCmd(
                 SnmpEngine(),
                 CommunityData("private"),
@@ -112,6 +112,12 @@ class WaveLamps:
                 ObjectType(oid),
             )
         )
+
+    def set_outlet_on(self, outlet):
+        self.set_outlet(outlet, 1)  # immediateOn
+
+    def set_outlet_off(self, outlet):
+        self.set_outlet(outlet, 2)  # immediateOff
 
     def all_lamps_on(self):
         for outlet in self.outlets:
@@ -128,9 +134,7 @@ class WaveLamps:
 
 if __name__ == "__main__":
 
-    import dk154_control  # For logger
-
-    print("testmode wavelamps")
+    import dk154_control
 
     wvlamps = WaveLamps(test_mode=True)
     wvlamps.all_lamps_off()
