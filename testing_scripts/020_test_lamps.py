@@ -15,7 +15,7 @@ if __name__ == "__main__":
 
     logger.info("script start")
 
-    with WaveLamps() as wv:
+    with WaveLamps(test_mode=args.test_mode) as wv:
 
         input("test \033[032;1moutlet=5 on\033[0m - press enter: ")
         try:
@@ -23,30 +23,34 @@ if __name__ == "__main__":
         except Exception as e:
             print(e)
             logger.info("outlet 5 on failed")
+        print("\n\n\n")
 
-        input("test \033[032;1moutlet 5 off1\033[0m - press enter: ")
+        input("test \033[032;1moutlet 5 off\033[0m - press enter: ")
         try:
             wv.set_outlet_off(5)
         except Exception as e:
             print(e)
             logger.info("outlet 5 off failed")
+        print("\n\n\n")
 
         input("test \033[032;1moutlet=6 on\033[0m - press enter: ")
         try:
-            wv.set_outlet_on(5)
+            wv.set_outlet_on(6)
         except Exception as e:
             print(e)
             logger.info("outlet 5 on failed")
+        print("\n\n\n")
 
-        input("test \033[032;1moutlet 6 off1\033[0m - press enter: ")
+        input("test \033[032;1moutlet=6 off\033[0m - press enter: ")
         try:
-            wv.set_outlet_off(5)
+            wv.set_outlet_off(6)
         except Exception as e:
             print(e)
             logger.info("outlet 5 off failed")
+        print("\n\n\n")
 
         input(
-            f"test \033[032;1mall lamps on (outlets {wv.outlets})\033[0m - press enter: "
+            f"test \033[032;1mall lamps on [outlets={wv.outlets}]\033[0m - press enter: "
         )
         try:
             wv.all_lamps_on()

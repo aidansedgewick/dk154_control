@@ -40,7 +40,7 @@ class WaveLamps:
     INTERNAL_HOST = "192.168.132.59"
     PDU_PORT = 161
     LOCAL_HOST = "127.0.0.1"
-    LOCAL_PORT = 8884
+    LOCAL_PORT = 8886
     DEFAULT_OUTLETS = (5, 6)
     AVAILABLE_OUTLETS = (1, 2, 3, 4, 5, 6, 7, 8)
 
