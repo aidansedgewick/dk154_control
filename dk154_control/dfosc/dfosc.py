@@ -9,7 +9,7 @@ Basic commands defined, and some additional start-up read-state commands for the
 
 import time
 
-# import socket
+import socket
 import telnetlib
 import yaml
 from logging import getLogger
@@ -83,18 +83,34 @@ class Dfosc:
         except Exception as e:
             self.dfosc_setup = {"grism": {}, "slit": {}, "filter": {}}
 
+        self.tn = None
+        self.sock = None
         self.connect_telnet()
+        # self.connect_socket()
 
     def connect_telnet(self):
         logger.info("Dfosc telnet connect")
         self.tn = telnetlib.Telnet(self.HOST, self.PORT)
 
+    def connect_socket(self):
+        logger.info("socket connect")
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((self.HOST, self.PORT))
+        self.conn_timestamp = time.time()
+        time.sleep(1.0)
+
+        self.sock = sock  # Don't call it 'socket', else overload module...
+
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.tn.close()
-        logger.info("DFOSC telnet closed in __exit__")
+        if self.tn is not None:
+            self.tn.close()
+            logger.info("DFOSC telnet closed in __exit__")
+        if self.sock is not None:
+            self.sock.close()
+            logger.info("DFOSC socket conn. closed in __exit__")
 
     def get_data(self, command: str):
         """
@@ -114,17 +130,20 @@ class Dfosc:
 
         try:
             logger.info(f"try sending {send_command}...")
-            print(self.tn)
             self.tn.write(send_command)
+            # self.sock.sendall(send_command)
         except IOError as e:
-            logger.info("try to reconnect telnet...")
+            logger.info("try to reconnect...")
             self.connect_telnet()
             self.tn.write(send_command)
+            # self.connect_socket()
+            # self.sock.sendall(send_command)
             if self.debug:
                 logger.info("successful send after reconnect.")
 
         TERMINATE_BYTES = "\n".encode("utf-8")  # telnet should return chars until THIS.
         data = self.tn.read_until(TERMINATE_BYTES)
+        # data = self.sock.recv(1024)  # returns bytes
         data = data.decode("utf-8")
         data = data.rstrip()
         data = data.split()
@@ -149,7 +168,7 @@ class Dfosc:
         """
         Grism Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
         """
-        command = f"GG{x}\n"
+        command = f"GG{x}"
         result_code, *dummy_values = self.get_data(command)
         return result_code
 
@@ -157,7 +176,7 @@ class Dfosc:
         """
         Grism Move relative nnnnnn. '+' or '-' can be entered before nnnnnn
         """
-        command = f"GM {x}\n"
+        command = f"GM{x}"
         result_code, *dummy_values = self.get_data(command)
         return result_code
 

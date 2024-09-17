@@ -532,6 +532,7 @@ class Ascol:
             msg = "fcop: use input '1' for open, '0' for close"
             raise AscolInputError(msg)
 
+        self.gllg()  # Use global login.
         command = f"FCOP {open_close}"
         return_code, *dummy_values = self.get_data(command)
         return return_code
@@ -956,6 +957,8 @@ class Ascol:
         flap_mirror_state = self.fmrs()
         curr_ra, curr_dec, curr_pos = self.trrd()
         shutter_pos = self.shrp()
+        wheel_a_state = self.wars()
+        wheel_b_state = self.wbrs()
         wheel_a_position = self.warp()
         wheel_b_position = self.wbrp()
 
@@ -972,6 +975,8 @@ class Ascol:
             f"    shutter pos [SHRP] : {shutter_pos}\n"
             f"    wheel A pos. [WARP]: {wheel_a_position}\n"
             f"    wheel B pos. [WBRP]: {wheel_b_position}\n"
+            f"    wh. A state  [WARS]: {wheel_a_state}\n"
+            f"    wh. B state  [WARS]: {wheel_b_state}\n"
         )
         logger.info(f"{status_str}")
         return
