@@ -247,7 +247,7 @@ class Dfosc:
         """
         for ii in range(N_tries):
             grism_ready = self.g()
-            if grism_ready == "y":
+            if grism_ready == "gy":
                 logger.info("grism wheel ready")
                 return
             time.sleep(sleep_time)
@@ -354,7 +354,7 @@ class Dfosc:
         """
         for ii in range(N_tries):
             aperture_ready = self.a()
-            if aperture_ready == "y":
+            if aperture_ready == "ay":
                 logger.info("aperture wheel ready")
                 return
             time.sleep(sleep_time)
@@ -460,7 +460,7 @@ class Dfosc:
         """
         for ii in range(N_tries):
             filter_ready = self.f()
-            if filter_ready == "y":
+            if filter_ready == "fy":
                 logger.info("filter wheel ready")
                 return
             time.sleep(sleep_time)
