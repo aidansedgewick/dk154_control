@@ -3,7 +3,7 @@
 # grism slit and filter are given either as either one number or multiple numbers separated by a space
 # script loops over all selected grism, slit, and filter combinations 
 # it takes n number of flats for each orientation
-# example: 011_test_dfosc_flats.py -n 4 -g 3 5 6 8 14 15 -s 1 1.5 2 2.5 -f 0
+# example: 011_test_dfosc_flats.py -n 4 -g 3 5 6 8 14 15 -s 1 1.5 2 2.5 -f empty0
 
 # import necessary packages
 import dk154_control.dfosc.dfosc as df

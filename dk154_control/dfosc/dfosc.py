@@ -148,7 +148,7 @@ class Dfosc:
         """
         Grism Goto position nnnnnn, where nnnnnn is the position number between 0 and 320000
         """
-        command = f"GG{x}\n"
+        command = f"GG{x}"
         result_code, *dummy_values = self.get_data(command)
         return result_code
 
@@ -156,7 +156,7 @@ class Dfosc:
         """
         Grism Move relative nnnnnn. '+' or '-' can be entered before nnnnnn
         """
-        command = f"GM {x}\n"
+        command = f"GM {x}"
         result_code, *dummy_values = self.get_data(command)
         return result_code
 

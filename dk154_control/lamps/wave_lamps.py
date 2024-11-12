@@ -1,5 +1,5 @@
 from logging import getLogger
-from pysnmp.hlapi.asyncio.cmdgen import *
+#from pysnmp.hlapi.asyncio.cmdgen import *
 from pysnmp.hlapi import (
     getCmd,
     setCmd,

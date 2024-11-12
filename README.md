@@ -194,6 +194,10 @@ Script for running through various arc calibration frames. Hg lamps will turn on
 
 Take an acquisition frame with slit in place, without a grism. Take for bright targets 10 < mag < 15 (used to check object alignment in slit). Example: python3 testing_scripts/013_test_dfosc_acquisition.py -s 2.5 -m 13
 
+#### 014_test_arc_lamp_start.py
+
+Takes images during the first 6 mintues of arc lamp warm-up to test if there are any lines other than Hg present in the spectrum (i.e. Ar). Preferred setup is using grism #15, a 1.5" slit, and no filter. Example: python3 testing_scripts/014_test_arc_lamp_start.py -g 15 -s 1.5 -f empty0
+
 #### 101_status_loop.py
 
 loop every 'n' seconds, log results from a set of status commands.
