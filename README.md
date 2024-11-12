@@ -202,7 +202,6 @@ Takes images during the first 6 mintues of arc lamp warm-up to test if there are
 
 loop every 'n' seconds, log results from a set of status commands.
 
-
 #### 998_startup.py
     
 *guide only* - unsure exactly what commands are needed to fully initialise telescope.
