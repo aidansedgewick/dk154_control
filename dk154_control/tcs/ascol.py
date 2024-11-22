@@ -63,7 +63,7 @@ class Ascol:
     ASCOL_PORT = (
         2003  # Same port used by the server, ports avail 2001-2009, 2007 is occupied
     )
-    LOCAL_PORT = 8888  # Alt-HTTP port -- safe to use?
+    LOCAL_PORT = 8883  # Alt-HTTP port -- safe to use?
     _GLOBAL_PASSWORD = "1178"
 
     def __init__(
@@ -212,7 +212,7 @@ class Ascol:
 
         func_name = func.__name__.upper()
         res_str = "/".join(expected_result)
-        logger.info(f"{func_name} wait for result: {res_str}")
+        logger.info(f"{func_name} wait for result: '{res_str}'")
 
         t_start = time.time()
         while time.time() - t_start < timeout:
@@ -220,6 +220,7 @@ class Ascol:
             if result in expected_result:
                 logger.info(f"{func_name} returned '{result}': exit")
                 return result
+            logger.info(f"{func_name} returned '{result}', wait {delay:.1f}s...")
             time.sleep(delay)
         msg = f"wait for {func_name} did not result in {expected_result} before timeout {timeout:.2f}s"
         raise WaitForResultTimeoutError(msg)
@@ -532,6 +533,7 @@ class Ascol:
             msg = "fcop: use input '1' for open, '0' for close"
             raise AscolInputError(msg)
 
+        self.gllg()  # Use global login.
         command = f"FCOP {open_close}"
         return_code, *dummy_values = self.get_data(command)
         return return_code
@@ -956,6 +958,8 @@ class Ascol:
         flap_mirror_state = self.fmrs()
         curr_ra, curr_dec, curr_pos = self.trrd()
         shutter_pos = self.shrp()
+        wheel_a_state = self.wars()
+        wheel_b_state = self.wbrs()
         wheel_a_position = self.warp()
         wheel_b_position = self.wbrp()
         wheel_a_state = self.wars()

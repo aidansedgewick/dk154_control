@@ -9,6 +9,8 @@ from astropy.coordinates import Angle, SkyCoord
 
 from dk154_control.tcs.ascol import Ascol
 
+from dk154_control.utils import ra_hms_to_deg, dec_dms_to_deg
+
 logger = getLogger("test_" + __file__.split("/")[-1].split("_")[0])
 
 
@@ -32,22 +34,23 @@ if __name__ == "__main__":
         ra, dec, tel_pos = ascol.trrd()
 
         # Some formatting to make it a SkyCoord to make it easy to nudge...
-        ra_str = f"{dec[:2]} {dec[2:4]} {dec[5:]}"
-        dec_str = f"{ra[:3]} {ra[3:5]} {ra[5:]}"
-        curr_coord = SkyCoord(ra=ra_str, dec=dec_str, unit=(u.hourangle, u.deg))
+        ra_deg = ra_hms_to_deg(ra)
+        dec_deg = dec_dms_to_deg(dec)
+        curr_coord = SkyCoord(ra=ra_deg, dec=dec_deg, unit=u.deg)
 
-        logger.info(f"currently: ra={ra}, dec={dec}, pos={tel_pos}")
-        logger.info(f"    = ({curr_coord.ra.deg:.4f}, {curr_coord.dec.deg:.4f})")
+        logger.info(f"curr ra={ra}, dec={dec}, pos={tel_pos}")
+        logger.info(f"   = ({curr_coord.ra.deg:.4f}, {curr_coord.dec.deg:+.4f})")
         print("\n\n\n")
 
         input("\033[32;1mNudge the telescope a bit\033[0m - press enter: ")
-        dra, ddec = +30.0 * u.arcmin, +30.0 * u.arcmin
+        dra, ddec = +60.0 * u.arcmin, +60.0 * u.arcmin
         new_coord = curr_coord.spherical_offsets_by(dra, ddec)
 
         ra_hms = new_coord.ra.hms
-        ra_str = f"{int(ra_hms.h):02d}{int(ra_hms.m):02d}{ra_hms.s:.1f}"  # Format...
+        ra_str = f"{int(ra_hms.h):02d}{int(ra_hms.m):02d}{ra_hms.s:04.1f}"  # Format...
         dec_dms = new_coord.dec.dms
-        dec_str = f"{int(dec_dms.d):+02d}{int(dec_dms.m)}{dec_dms.s:.1f}"
+        dec_sstr = f"{abs(dec_dms.s):04.1f}"
+        dec_str = f"{int(dec_dms.d):+02d}{abs(int(dec_dms.m)):02d}{dec_sstr}"
         pos_str = POSITION_LOOKUP[tel_pos]
 
         logger.info(f"move to: ra={ra_str}, dec={dec_str}, pos={pos_str}")
@@ -86,3 +89,15 @@ if __name__ == "__main__":
                 if tel_state == "sky track":
                     break
                 time.sleep(2.0)
+        print("\n\n\n")
+
+        input("\033[32;1mGet current ra, dec, pos\033[0m - press enter: ")
+        ra, dec, tel_pos = ascol.trrd()
+
+        # Some formatting to make it a SkyCoord to make it easy to nudge...
+        ra_deg = ra_hms_to_deg(ra)
+        dec_deg = dec_dms_to_deg(dec)
+        curr_coord = SkyCoord(ra=ra_deg, dec=dec_deg, unit=u.deg)
+
+        logger.info(f"curr ra={ra}, dec={dec}, pos={tel_pos}")
+        logger.info(f"   = ({curr_coord.ra.deg:.4f}, {curr_coord.dec.deg:+.4f})")

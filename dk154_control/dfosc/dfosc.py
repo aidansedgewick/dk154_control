@@ -9,7 +9,7 @@ Basic commands defined, and some additional start-up read-state commands for the
 
 import time
 
-# import socket
+import socket
 import telnetlib
 import yaml
 from logging import getLogger
@@ -23,6 +23,7 @@ These are the commands that are sent directly to the MOXA (figure out the IP & p
 Includes aperture (slit), filter, and grism wheel commands.
 """
 
+
 def load_dfosc_setup(setup_path=None):
     setup_path = setup_path or Path(__file__).parent / "dfosc_setup.yaml"
     with open(setup_path, "r") as f:
@@ -32,8 +33,10 @@ def load_dfosc_setup(setup_path=None):
 def guess_wheel_pos(current_pos, wheel_setup):
     if len(wheel_setup) == 0:
         return "???", None
+
+    int_pos = int(current_pos)
     likely_key, likely_val = min(
-        wheel_setup.items(), key=lambda x: (abs(current_pos - x[1]) % 320000)
+        wheel_setup.items(), key=lambda x: abs((int_pos - x[1]) % 320000)
     )
     return likely_key, likely_val
 
@@ -56,7 +59,7 @@ class Dfosc:
     EXTERNAL_HOST = ""  # No external host currently
     MOXA_PORT = 4001
     LOCAL_HOST = "127.0.0.1"
-    LOCAL_PORT = 8883  # Matches with MockDfoscServer
+    LOCAL_PORT = 8885  # Matches with MockDfoscServer
 
     def __init__(self, test_mode=False, debug=False, external=False):
 
@@ -82,18 +85,34 @@ class Dfosc:
         except Exception as e:
             self.dfosc_setup = {"grism": {}, "slit": {}, "filter": {}}
 
+        self.tn = None
+        self.sock = None
         self.connect_telnet()
+        # self.connect_socket()
 
     def connect_telnet(self):
         logger.info("Dfosc telnet connect")
         self.tn = telnetlib.Telnet(self.HOST, self.PORT)
 
+    def connect_socket(self):
+        logger.info("socket connect")
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((self.HOST, self.PORT))
+        self.conn_timestamp = time.time()
+        time.sleep(1.0)
+
+        self.sock = sock  # Don't call it 'socket', else overload module...
+
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.tn.close()
-        logger.info("DFOSC telnet closed in __exit__")
+        if self.tn is not None:
+            self.tn.close()
+            logger.info("DFOSC telnet closed in __exit__")
+        if self.sock is not None:
+            self.sock.close()
+            logger.info("DFOSC socket conn. closed in __exit__")
 
     def get_data(self, command: str):
         """
@@ -113,17 +132,20 @@ class Dfosc:
 
         try:
             logger.info(f"try sending {send_command}...")
-            print(self.tn)
             self.tn.write(send_command)
+            # self.sock.sendall(send_command)
         except IOError as e:
-            logger.info("try to reconnect telnet...")
+            logger.info("try to reconnect...")
             self.connect_telnet()
             self.tn.write(send_command)
+            # self.connect_socket()
+            # self.sock.sendall(send_command)
             if self.debug:
                 logger.info("successful send after reconnect.")
 
         TERMINATE_BYTES = "\n".encode("utf-8")  # telnet should return chars until THIS.
         data = self.tn.read_until(TERMINATE_BYTES)
+        # data = self.sock.recv(1024)  # returns bytes
         data = data.decode("utf-8")
         data = data.rstrip()
         data = data.split()
@@ -156,7 +178,7 @@ class Dfosc:
         """
         Grism Move relative nnnnnn. '+' or '-' can be entered before nnnnnn
         """
-        command = f"GM {x}"
+        command = f"GM{x}"
         result_code, *dummy_values = self.get_data(command)
         return result_code
 
@@ -196,7 +218,6 @@ class Dfosc:
         """
         command = f"g"
         return_code, *dummy_values = self.get_data(command)
-        print(dummy_values)
         return return_code
 
     def gx(self):
@@ -227,7 +248,7 @@ class Dfosc:
         """
         for ii in range(N_tries):
             grism_ready = self.g()
-            if grism_ready == "y":
+            if grism_ready == "gy":
                 logger.info("grism wheel ready")
                 return
             time.sleep(sleep_time)
@@ -241,7 +262,7 @@ class Dfosc:
         result = self.gg(position)
         self.grism_wait()
         return result
-    
+
     def ai(self):
         """
         Aperture Initialize position to hall switch and aperture_zero offset
@@ -272,7 +293,6 @@ class Dfosc:
         """
         command = f"AP"
         result_code, *dummy_values = self.get_data(command)
-        print(result_code, dummy_values)
         return result_code
 
     def an(self, position: str):
@@ -327,14 +347,14 @@ class Dfosc:
         self.ai()
         self.aperture_wait()
         return
-    
+
     def aperture_wait(self, N_tries=24, sleep_time=5.0):
         """
         Wait for aperture wheel to be ready
         """
         for ii in range(N_tries):
             aperture_ready = self.a()
-            if aperture_ready == "y":
+            if aperture_ready == "ay":
                 logger.info("aperture wheel ready")
                 return
             time.sleep(sleep_time)
@@ -440,7 +460,7 @@ class Dfosc:
         """
         for ii in range(N_tries):
             filter_ready = self.f()
-            if filter_ready == "y":
+            if filter_ready == "fy":
                 logger.info("filter wheel ready")
                 return
             time.sleep(sleep_time)
@@ -463,27 +483,28 @@ class Dfosc:
         filter_ready = self.f()
         filter_pos = self.fp()
 
-        try:
-            grism_guess, grism_value = guess_wheel_pos(
-                grism_pos, self.dfosc_setup["grism"]
-            )
-            aper_guess, aper_value = guess_wheel_pos(
-                grism_pos, self.dfosc_setup["slit"]
-            )
-            filter_guess, filter_value = guess_wheel_pos(
-                grism_pos, self.dfosc_setup["filter"]
-            )
-        except Exception as e:
-            grism_guess, aper_guess, filter_pos = "?", "?", "?"
+        # try:
+        #     grism_guess, grism_value = guess_wheel_pos(
+        #         grism_pos, self.dfosc_setup["grism"]
+        #     )
+        #     aper_guess, aper_value = guess_wheel_pos(
+        #         grism_pos, self.dfosc_setup["slit"]
+        #     )
+        #     filter_guess, filter_value = guess_wheel_pos(
+        #         grism_pos, self.dfosc_setup["filter"]
+        #     )
+        # except Exception as e:
+        #     print(e)
+        #     grism_guess, aper_guess, filter_guess = "?ERR", "?ERR", "?ERR"
 
         status_str = (
             f"DFOSC status:\n"
             f"    grism wheel ready? {grism_ready}\n"
             f"    aper wheel ready? {aper_ready}\n"
             f"    filter wheel ready? {filter_ready}\n"
-            f"    grism pos: {grism_pos} (likely '{grism_guess}')\n"
-            f"    aper pos: {aper_pos} (likely '{aper_guess}')\n"
-            f"    filter pos: {filter_pos} (likely '{filter_guess}')\n"
+            f"    grism pos: {grism_pos}\n"  # (likely '{grism_guess}')\n"
+            f"    aper pos: {aper_pos}\n"  # (likely '{aper_guess}')\n"
+            f"    filter pos: {filter_pos}\n"  # (likely '{filter_guess}')\n"
         )
 
         logger.info(status_str)

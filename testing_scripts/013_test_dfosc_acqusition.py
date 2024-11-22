@@ -9,7 +9,9 @@ from dk154_control.dfosc.dfosc import Dfosc
 from dk154_control.camera.ccd3 import Ccd3
 import yaml
 
-dfosc_setup = yaml.load(open('dk154_control/dfosc/dfosc_setup.yaml'), Loader=yaml.FullLoader)
+dfosc_setup = yaml.load(
+    open("dk154_control/dfosc/dfosc_setup.yaml"), Loader=yaml.FullLoader
+)
 
 logger = getLogger("test_" + __file__.split("/")[-1].split("_")[0])
 
@@ -17,7 +19,8 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-t", "--test-mode", action="store_true", default=False)
     parser.add_argument("-d", "--debug", action="store_true", default=False)
-    parser.add_argument("-s", "--slit", type=str, default='empty', choices=dfosc_setup['slit'].keys())
+    slit_choices = list(dfosc_setup["slit"].keys())
+    parser.add_argument("-s", "--slit", type=str, default="empty", choices=slit_choices)
     parser.add_argument("-m", "--mag", type=float)
     args = parser.parse_args()
 
@@ -36,7 +39,7 @@ if __name__ == "__main__":
 
         try:
             grism = dfosc.gp()
-            slit = dfosc.aperture_goto(dfosc_setup['slit'][args.slit])
+            slit = dfosc.aperture_goto(dfosc_setup["slit"][args.slit])
             exp_params = {}
 
             dfosc.grism_goto(0)
@@ -45,12 +48,12 @@ if __name__ == "__main__":
             if slit == 0:
                 input("test \033[032;1mSlit in empty position\033[0m - press enter: ")
                 logger.info(f"Slit wheel in position: empty")
-                imgtpe = 'OBJECT'
+                imgtpe = "OBJECT"
 
             else:
                 input("test \033[032;1mSlit in position\033[0m - press enter: ")
                 logger.info(f"Slit wheel in position: {slit}")
-                imgtpe = 'OBJECT,SLIT'
+                imgtpe = "OBJECT,SLIT"
 
             if mag < 10:
                 exp_time = 10
@@ -63,14 +66,16 @@ if __name__ == "__main__":
             else:
                 exp_time = 90
 
-            exp_params['CCD3.exposure'] = exp_time #TODO: adjust exposure time based on target magnitude
-            exp_params['CCD3.IMAGETYP'] = imgtpe
-            exp_params['CCD3.OBJECT'] = 'DFOSC target acquisition'
+            exp_params["CCD3.exposure"] = (
+                exp_time  # TODO: adjust exposure time based on target magnitude
+            )
+            exp_params["CCD3.IMAGETYP"] = imgtpe
+            exp_params["CCD3.OBJECT"] = "DFOSC target acquisition"
             ccd = Ccd3()
             ccd.set_exposure_parameters(params=exp_params)
-            filename = f'test_acquisition_{0:03d}.fits'
+            filename = f"test_acquisition_{0:03d}.fits"
             logger.info(f"acquisition image without slit")
-            logger.info(f"filename: {filename}") 
+            logger.info(f"filename: {filename}")
             ccd.start_exposure(filename=filename)
 
         except Exception as e:
@@ -78,4 +83,4 @@ if __name__ == "__main__":
             logger.info(traceback.format_exc())
             logger.info("acquisition failed")
         print("\n\n\n")
-        time.sleep(exp_params['CCD3.exposure']+30)
+        time.sleep(exp_params["CCD3.exposure"] + 30)

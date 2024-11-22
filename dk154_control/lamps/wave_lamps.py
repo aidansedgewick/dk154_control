@@ -1,6 +1,8 @@
+import asyncio
+
 from logging import getLogger
-#from pysnmp.hlapi.asyncio.cmdgen import *
-from pysnmp.hlapi import (
+
+from pysnmp.hlapi.v3arch.asyncio import (
     getCmd,
     setCmd,
     SnmpEngine,
@@ -38,7 +40,7 @@ class WaveLamps:
     INTERNAL_HOST = "192.168.132.59"
     PDU_PORT = 161
     LOCAL_HOST = "127.0.0.1"
-    LOCAL_PORT = 8884
+    LOCAL_PORT = 8886
     DEFAULT_OUTLETS = (5, 6)
     AVAILABLE_OUTLETS = (1, 2, 3, 4, 5, 6, 7, 8)
 
@@ -61,7 +63,7 @@ class WaveLamps:
 
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exc_type, exc_value, traceback):
         pass
 
@@ -82,7 +84,7 @@ class WaveLamps:
 
         oid = ObjectIdentity(f"{self.ePDUOutletControlOutletCommand}.{outlet}")
 
-        errorIndication, errorStatus, errorIndex, varBinds = next(
+        errorIndication, errorStatus, errorIndex, varBinds = asyncio.run(
             setCmd(
                 SnmpEngine(),
                 CommunityData("private"),
@@ -101,7 +103,7 @@ class WaveLamps:
 
         oid = ObjectIdentity(f"{self.ePDUOutletControlOutletCommand}.{outlet}")
 
-        errorIndication, errorStatus, errorIndex, varBinds = next(
+        errorIndication, errorStatus, errorIndex, varBinds = asyncio.run(
             getCmd(
                 SnmpEngine(),
                 CommunityData("private"),
@@ -110,6 +112,12 @@ class WaveLamps:
                 ObjectType(oid),
             )
         )
+
+    def set_outlet_on(self, outlet):
+        self.set_outlet(outlet, 1)  # immediateOn
+
+    def set_outlet_off(self, outlet):
+        self.set_outlet(outlet, 2)  # immediateOff
 
     def all_lamps_on(self):
         for outlet in self.outlets:
@@ -126,9 +134,7 @@ class WaveLamps:
 
 if __name__ == "__main__":
 
-    import dk154_control  # For logger
-
-    print("testmode wavelamps")
+    import dk154_control
 
     wvlamps = WaveLamps(test_mode=True)
     wvlamps.all_lamps_off()
