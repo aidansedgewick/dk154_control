@@ -11,6 +11,7 @@ import socket
 from logging import getLogger
 
 from dk154_control.tcs import ascol_constants
+from dk154_control.utils import SilenceLoggers
 
 logger = getLogger(__name__.split(".")[-1])
 
@@ -70,7 +71,7 @@ class Ascol:
         self,
         test_mode: bool = False,
         debug: bool = False,
-        delay: float = None,
+        delay: float = 0.1,
         external: bool = False,
     ):
 
@@ -103,7 +104,7 @@ class Ascol:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((self.HOST, self.PORT))
         self.conn_timestamp = time.time()
-        time.sleep(1.0)
+        time.sleep(0.5)
 
         self.sock = sock  # Don't name it 'socket' else overload module...
 
@@ -150,7 +151,8 @@ class Ascol:
 
         send_command = (command + "\n").encode("utf-8")
 
-        time.sleep(0.1)  # Sensible to wait a little?
+        if self.delay is not None:
+            time.sleep(self.delay)  # Sensible to wait a little?
 
         try:
             self.sock.sendall(send_command)  # Send the command to the TCS computer
@@ -172,9 +174,6 @@ class Ascol:
             logger.info(
                 f"data received from server {self.HOST}:{self.PORT}\n    {data}"
             )
-
-        if self.delay is not None:
-            time.sleep(self.delay)
 
         if len(data) == 1 and data[0] == "ERR":
             command_code = command.split()[0]
@@ -1010,3 +1009,72 @@ class Ascol:
         )
         logger.info(status_str)
         return
+
+
+class AscolStatus:
+
+    @classmethod
+    def collect_silent(
+        cls,
+        test_mode: bool = False,
+        debug: bool = False,
+        delay: float = None,
+        external: bool = False,
+    ):
+        with SilenceLoggers():
+            status = cls(
+                test_mode=test_mode, debug=debug, delay=delay, external=external
+            )
+        return status
+
+    def __init__(
+        self,
+        test_mode: bool = False,
+        debug: bool = False,
+        delay: float = None,
+        external: bool = False,
+    ):
+        with Ascol(
+            test_mode=test_mode, debug=debug, delay=delay, external=external
+        ) as ascol:
+            mjd, time_str = ascol.glut()
+            self.mjd = mjd
+            self.time_str = time_str
+            self.remote_state = ascol.glre()
+            self.safety_relay_state = ascol.glsr()
+            self.telescope_state = ascol.ters()
+            self.dome_state = ascol.dors()
+            self.dome_slit_state = ascol.doss()
+            self.flap_cassegrain_state = ascol.fcrs()
+            self.flap_mirror_state = ascol.fmrs()
+            current_ra, current_dec, current_position = ascol.trrd()
+            self.current_ra = current_ra
+            self.current_dec = current_dec
+            self.current_position = current_position
+            self.shutter_position = ascol.shrp()
+            self.wheel_a_state = ascol.wars()
+            self.wheel_b_state = ascol.wbrs()
+            self.wheel_a_position = ascol.warp()
+            self.wheel_b_position = ascol.wbrp()
+
+    def get_status_str(self):
+        return (
+            f"Telescope status:\n"
+            f"    remote/local [GLRE]: {self.remote_state}\n"
+            f"    safety relay [GLSR]: {self.safety_relay_state}\n"
+            f"    tel. state [TERS]  : {self.telescope_state}\n"
+            f"    dome state [DORS]  : {self.dome_state}\n"
+            f"    domeslit st. [DOSS]: {self.dome_slit_state}\n"
+            f"    casseg. flap [FCRS]: {self.flap_cassegrain_state}\n"
+            f"    mirror flap [FMRS] : {self.flap_mirror_state}\n"
+            f"    RA/Dec (pos) [TRRD]: {self.current_ra}, {self.current_dec} ({self.current_position})\n"
+            f"    shutter pos [SHRP] : {self.shutter_position}\n"
+            f"    wheel A pos. [WARP]: {self.wheel_a_position}\n"
+            f"    wheel B pos. [WBRP]: {self.wheel_b_position}\n"
+            f"    wh. A state  [WARS]: {self.wheel_a_state}\n"
+            f"    wh. B state  [WARS]: {self.wheel_b_state}\n"
+        )
+
+    def log_telescope_status(self):
+        status_str = self.get_status_str()
+        logger.info(f"{status_str}")

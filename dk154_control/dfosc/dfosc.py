@@ -15,6 +15,8 @@ import yaml
 from logging import getLogger
 from pathlib import Path
 
+from dk154_control.utils import SilenceLoggers
+
 logger = getLogger(__name__.split(".")[-1])
 
 """
@@ -30,15 +32,8 @@ def load_dfosc_setup(setup_path=None):
         return yaml.load(f, Loader=yaml.FullLoader)
 
 
-def guess_wheel_pos(current_pos, wheel_setup):
-    if len(wheel_setup) == 0:
-        return "???", None
-
-    int_pos = int(current_pos)
-    likely_key, likely_val = min(
-        wheel_setup.items(), key=lambda x: abs((int_pos - x[1]) % 320000)
-    )
-    return likely_key, likely_val
+def guess_wheel_pos(current_pos, wheel_setup: dict):
+    raise NotImplementedError()
 
 
 class DfoscError(Exception):
@@ -223,6 +218,8 @@ class Dfosc:
     def gx(self):
         """
         Grism Goto hall initial position. Ressets aperture_zero to 0
+
+        SHOULD NEVER NEED TO USE THIS
         """
         (return_code,) = self.get_data("GX")
         return return_code
@@ -230,6 +227,8 @@ class Dfosc:
     def gidfoc(self):
         """
         Set zero position to current position. Records the aperture_zero value in eeprom.
+
+        SHOULD NEVER NEED TO USE THIS
         """
         (return_code,) = self.get_data("Gidfoc")
         return return_code
@@ -327,6 +326,8 @@ class Dfosc:
     def ax(self):
         """
         Aperture Goto hall initial position. Ressets aperture_zero to 0
+
+        SHOULD NEVER NEED TO USE THIS
         """
         command = f"AX"
         result_code, *dummy_values = self.get_data(command)
@@ -335,6 +336,8 @@ class Dfosc:
     def aidfoc(self):
         """
         Set zero position to current position. Records the aperture_zero value in eeprom.
+
+        SHOULD NEVER NEED TO USE THIS
         """
         command = f"Aidfoc"
         result_code, *dummy_values = self.get_data(command)
@@ -433,6 +436,8 @@ class Dfosc:
     def fx(self):
         """
         Filter Goto hall initial position. Ressets aperture_zero to 0
+
+        SHOULD NEVER NEED TO USE THIS
         """
         command = f"FX"
         result_code, *dummy_values = self.get_data(command)
@@ -441,6 +446,8 @@ class Dfosc:
     def fidfoc(self):
         """
         Set zero position to current position. Records the aperture_zero value in eeprom.
+
+        SHOULD NEVER NEED TO USE THIS
         """
         command = f"Fidfoc"
         result_code, *dummy_values = self.get_data(command)
@@ -508,3 +515,45 @@ class Dfosc:
         )
 
         logger.info(status_str)
+
+
+class DfoscStatus:
+
+    @classmethod
+    def collect_silent(cls, test_mode=False):
+        with SilenceLoggers():
+            status = cls(test_mode=test_mode)
+        return status
+
+    def __init__(self, test_mode=False):
+
+        try:
+            self.dfosc_setup = load_dfosc_setup()
+        except Exception as e:
+            self.dfosc_setup = {"grism": {}, "slit": {}, "filter": {}}
+
+        with Dfosc(test_mode=test_mode) as dfosc:
+            self.grism_ready = dfosc.g()
+            self.grism_position = dfosc.gp()
+            self.aper_ready = dfosc.a()
+            self.aper_position = dfosc.ap()
+            self.filter_ready = dfosc.f()
+            self.filter_position = dfosc.fp()
+
+        # try:
+        #     grism_guess, grism_value = guess_wheel_pos(
+        #         self.grism_position, self.dfosc_setup["grism"]
+        #     )
+        #     aper_guess, aper_value = guess_wheel_pos(
+        #         self.aper_position, self.dfosc_setup["slit"]
+        #     )
+        #     filter_guess, filter_value = guess_wheel_pos(
+        #         self.filter_position, self.dfosc_setup["filter"]
+        #     )
+        # except Exception as e:
+        #     print(e)
+        #     grism_guess, aper_guess, filter_guess = "ERR", "ERR", "ERR"
+
+        self.grism_name_guess = "???"  # grism_guess
+        self.aper_name_guess = "???"  # aper_guess
+        self.filter_name_guess = "??? "  # filter_guess
