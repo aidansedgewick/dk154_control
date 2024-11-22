@@ -212,7 +212,7 @@ class Ascol:
 
         func_name = func.__name__.upper()
         res_str = "/".join(expected_result)
-        logger.info(f"wait for result: {res_str}")
+        logger.info(f"{func_name} wait for result: {res_str}")
 
         t_start = time.time()
         while time.time() - t_start < timeout:
@@ -251,7 +251,7 @@ class Ascol:
         GLobal LoGin [ASCOL 2.2]
 
         Args:
-            password (str, default: "****"): 
+            password (str, default: "****"):
                 Send this string as the password to the server.
                 You will likely never need to provide this.
 
@@ -958,6 +958,8 @@ class Ascol:
         shutter_pos = self.shrp()
         wheel_a_position = self.warp()
         wheel_b_position = self.wbrp()
+        wheel_a_state = self.wars()
+        wheel_b_state = self.wbrs()
 
         status_str = (
             f"Telescope status:\n"
@@ -972,6 +974,8 @@ class Ascol:
             f"    shutter pos [SHRP] : {shutter_pos}\n"
             f"    wheel A pos. [WARP]: {wheel_a_position}\n"
             f"    wheel B pos. [WBRP]: {wheel_b_position}\n"
+            f"    wh. A state  [WARS]: {wheel_a_state}\n"
+            f"    wh. B state  [WARS]: {wheel_b_state}\n"
         )
         logger.info(f"{status_str}")
         return
