@@ -211,7 +211,7 @@ class Ascol:
 
         func_name = func.__name__.upper()
         res_str = "/".join(expected_result)
-        logger.info(f"wait for result: {res_str}")
+        logger.info(f"{func_name} wait for result: '{res_str}'")
 
         t_start = time.time()
         while time.time() - t_start < timeout:
@@ -219,6 +219,7 @@ class Ascol:
             if result in expected_result:
                 logger.info(f"{func_name} returned '{result}': exit")
                 return result
+            logger.info(f"{func_name} returned '{result}', wait {delay:.1f}s...")
             time.sleep(delay)
         msg = f"wait for {func_name} did not result in {expected_result} before timeout {timeout:.2f}s"
         raise WaitForResultTimeoutError(msg)
@@ -960,6 +961,8 @@ class Ascol:
         wheel_b_state = self.wbrs()
         wheel_a_position = self.warp()
         wheel_b_position = self.wbrp()
+        wheel_a_state = self.wars()
+        wheel_b_state = self.wbrs()
 
         status_str = (
             f"Telescope status:\n"

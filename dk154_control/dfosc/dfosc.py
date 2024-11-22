@@ -33,13 +33,7 @@ def load_dfosc_setup(setup_path=None):
 
 
 def guess_wheel_pos(current_pos, wheel_setup: dict):
-    if len(wheel_setup) == 0:
-        return "???", None
-    int_pos = int(current_pos)
-    likely_key, likely_val = min(
-        wheel_setup.items(), key=lambda x: (abs(int_pos - int(x[1])) % 320000)
-    )
-    return likely_key, likely_val
+    raise NotImplementedError()
 
 
 class DfoscError(Exception):
@@ -496,27 +490,28 @@ class Dfosc:
         filter_ready = self.f()
         filter_pos = self.fp()
 
-        try:
-            grism_guess, grism_value = guess_wheel_pos(
-                grism_pos, self.dfosc_setup["grism"]
-            )
-            aper_guess, aper_value = guess_wheel_pos(
-                grism_pos, self.dfosc_setup["slit"]
-            )
-            filter_guess, filter_value = guess_wheel_pos(
-                grism_pos, self.dfosc_setup["filter"]
-            )
-        except Exception as e:
-            grism_guess, aper_guess, filter_pos = "?", "?", "?"
+        # try:
+        #     grism_guess, grism_value = guess_wheel_pos(
+        #         grism_pos, self.dfosc_setup["grism"]
+        #     )
+        #     aper_guess, aper_value = guess_wheel_pos(
+        #         grism_pos, self.dfosc_setup["slit"]
+        #     )
+        #     filter_guess, filter_value = guess_wheel_pos(
+        #         grism_pos, self.dfosc_setup["filter"]
+        #     )
+        # except Exception as e:
+        #     print(e)
+        #     grism_guess, aper_guess, filter_guess = "?ERR", "?ERR", "?ERR"
 
         status_str = (
             f"DFOSC status:\n"
             f"    grism wheel ready? {grism_ready}\n"
             f"    aper wheel ready? {aper_ready}\n"
             f"    filter wheel ready? {filter_ready}\n"
-            f"    grism pos: {grism_pos} (likely '{grism_guess}')\n"
-            f"    aper pos: {aper_pos} (likely '{aper_guess}')\n"
-            f"    filter pos: {filter_pos} (likely '{filter_guess}')\n"
+            f"    grism pos: {grism_pos}\n"  # (likely '{grism_guess}')\n"
+            f"    aper pos: {aper_pos}\n"  # (likely '{aper_guess}')\n"
+            f"    filter pos: {filter_pos}\n"  # (likely '{filter_guess}')\n"
         )
 
         logger.info(status_str)
@@ -545,20 +540,20 @@ class DfoscStatus:
             self.filter_ready = dfosc.f()
             self.filter_position = dfosc.fp()
 
-        try:
-            grism_guess, grism_value = guess_wheel_pos(
-                self.grism_position, self.dfosc_setup["grism"]
-            )
-            aper_guess, aper_value = guess_wheel_pos(
-                self.aper_position, self.dfosc_setup["slit"]
-            )
-            filter_guess, filter_value = guess_wheel_pos(
-                self.filter_position, self.dfosc_setup["filter"]
-            )
-        except Exception as e:
-            print(e)
-            grism_guess, aper_guess, filter_guess = "ERR", "ERR", "ERR"
+        # try:
+        #     grism_guess, grism_value = guess_wheel_pos(
+        #         self.grism_position, self.dfosc_setup["grism"]
+        #     )
+        #     aper_guess, aper_value = guess_wheel_pos(
+        #         self.aper_position, self.dfosc_setup["slit"]
+        #     )
+        #     filter_guess, filter_value = guess_wheel_pos(
+        #         self.filter_position, self.dfosc_setup["filter"]
+        #     )
+        # except Exception as e:
+        #     print(e)
+        #     grism_guess, aper_guess, filter_guess = "ERR", "ERR", "ERR"
 
-        self.grism_name_guess = grism_guess
-        self.aper_name_guess = aper_guess
-        self.filter_name_guess = filter_guess
+        self.grism_name_guess = "???"  # grism_guess
+        self.aper_name_guess = "???"  # aper_guess
+        self.filter_name_guess = "??? "  # filter_guess

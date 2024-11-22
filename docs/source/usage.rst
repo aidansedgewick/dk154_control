@@ -52,10 +52,10 @@ A typical command for moving the grism wheel, then reading the position of the w
 
 .. code-block:: python
 
-    grisms = yaml.load(open('dk154_control/dfosc/dfosc_setup.yaml'), Loader=yaml.FullLoader)['grism']
+    dfosc_setup = yaml.load(open('dk154_control/dfosc/dfosc_setup.yaml'), Loader=yaml.FullLoader)
 
         with Dfosc() as dfosc:
-            dfosc.gg(grisms['15'])
+            dfosc.gg(dfosc_setup['grism']['15'])
             time.sleep(10)
             dfosc.gp()
 
@@ -98,7 +98,7 @@ The function `all_lamps_on` powers on outlets 5 & 6, and `all_lamps_off` turns t
 These still need to be tested/changed on the .55 machine (see dfosc_arc_calib.py for the current implementation).
 
 .. code-block:: python
-
+    
     with WaveLamps() as lamps:
         lamps.all_lamps_on()
         lamps.all_lamps_off()
