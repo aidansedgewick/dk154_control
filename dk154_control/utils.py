@@ -1,6 +1,23 @@
+import logging
+
+import os
+
 import numpy as np
 
 from astropy.coordinates import Angle
+
+
+class SilenceLoggers:
+
+    def __enter__(self):
+        logging.disable(logging.CRITICAL)
+
+    def __exit__(self, exit_type, exit_value, exit_traceback):
+        logging.disable(logging.NOTSET)
+
+
+def get_output_directory():
+    # base_data_dir = os.environ.get("BASE_DATA_DIR", )
 
 
 def dec_dms_to_deg(dms):

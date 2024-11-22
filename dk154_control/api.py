@@ -8,6 +8,7 @@ from dk154_control.camera.ccd3 import Ccd3
 from dk154_control.tcs.ascol import Ascol
 from dk154_control.tcs import ascol_constants
 from dk154_control.dfosc.dfosc import Dfosc, load_dfosc_setup
+from dk154_control.lamps.wave_lamps import WaveLamps
 
 logger = getLogger("DK154")
 
@@ -154,7 +155,7 @@ class DK154:
 
         return res
 
-    def move_wheel_a_and_wait(self, wheel_a_filter: str, wait_for_state="stopped"):
+    def move_wheel_a_and_wait(self, wheel_a_filter: str, wait_for_state="locked"):
         """
         Move FASU A wheel to provided filter, and wait until FASU A state is 'stopped'
 
@@ -163,7 +164,7 @@ class DK154:
                 the NAME of the filter eg. 'Stromgr v', 'OIII', 'empty',
                 NOT ascol pos (eg '01', '02', '03'). Raises KeyError if unknown
                 filter (as defined in ``ascol.ascol_constants.WARP_CODES``)
-            wait_for_state ()str or tuple of str, default="stopped"):
+            wait_for_state (str or tuple of str, default="locked"):
                 Wait for ``ascol.wars`` (Wheel A Read State) to be one of these state(s).
 
         Returns:
@@ -172,8 +173,12 @@ class DK154:
 
         """
 
-        wheel_a_pos = FASU_A_POS_LOOKUP.get(wheel_a_filter, None)
+        expected_WARS_states = list(ascol_constants.WARS_CODES.values())
+        if wait_for_state not in expected_WARS_states:
+            msg = f"wait_for_state must be one of {expected_WARS_states}, not '{wait_for_state}'"
+            raise ValueError(msg)
 
+        wheel_a_pos = FASU_A_POS_LOOKUP.get(wheel_a_filter, None)
         if wheel_a_pos is None:
             msg = (
                 f"unknown FASU A filter '{wheel_a_filter}'\n"
@@ -181,11 +186,14 @@ class DK154:
             )
             raise KeyError(msg)
 
+        logger.info(f"move FASU A to {wheel_a_filter} (pos={wheel_a_pos}) and wait...")
+
         with Ascol(test_mode=self.test_mode) as ascol:
             wheel_a_curr = ascol.warp()
+            logger.info(f"FASU A current/target: {wheel_a_curr}/{wheel_a_filter}")
             wheel_a_state = ascol.wars()
-            if wheel_a_pos == wheel_a_curr:
-                logger.info(f"FASU A already at {wheel_a_filter}")
+            if wheel_a_filter == wheel_a_curr:
+                logger.info(f"FASU A already at {wheel_a_filter} - done!")
                 return
 
             wasp_result = ascol.wasp(wheel_a_pos)
@@ -194,7 +202,7 @@ class DK154:
             res = ascol.wait_for_result(ascol.wars, expected_result=wait_for_state)
         return res
 
-    def move_wheel_b_and_wait(self, wheel_b_filter: str, wait_for_state="stopped"):
+    def move_wheel_b_and_wait(self, wheel_b_filter: str, wait_for_state="locked"):
         """
         Move FASU B wheel to provided filter, and wait until FASU A state is 'stopped'
 
@@ -212,8 +220,12 @@ class DK154:
 
         """
 
-        wheel_b_pos = FASU_B_POS_LOOKUP.get(wheel_b_filter, None)
+        expected_WBRS_states = list(ascol_constants.WBRS_CODES.values())
+        if wait_for_state not in expected_WBRS_states:
+            msg = f"wait_for_state must be one of {expected_WBRS_states}, not '{wait_for_state}'"
+            raise ValueError(msg)
 
+        wheel_b_pos = FASU_B_POS_LOOKUP.get(wheel_b_filter, None)
         if wheel_b_pos is None:
             msg = (
                 f"unknown FASU B filter '{wheel_b_filter}'\n"
@@ -221,11 +233,13 @@ class DK154:
             )
             raise KeyError(msg)
 
+        logger.info(f"move FASU B to {wheel_b_filter} (pos={wheel_b_pos}) and wait...")
+
         with Ascol(test_mode=self.test_mode) as ascol:
             wheel_b_curr = ascol.wbrp()
             wheel_b_state = ascol.wbrs()
-            if wheel_b_pos == wheel_b_curr:
-                logger.info(f"FASU B already at {wheel_b_filter}")
+            if wheel_b_filter == wheel_b_curr:
+                logger.info(f"FASU B already at {wheel_b_filter} - done!")
                 return
 
             wasp_result = ascol.wbsp(wheel_b_pos)
@@ -372,7 +386,7 @@ class DK154:
                 ccd_status = ccd3.get_ccd_state()
             logger.info(f"CCD state: {ccd_status}")
             if read_wait:
-                logger.info(f"wait {read_wait} sec for read")
+                logger.info(f"wait {read_wait} sec for CCD read")
                 time.sleep(read_wait)
                 with Ccd3(test_mode=self.test_mode) as ccd3:
                     ccd_status = ccd3.get_ccd_state()
@@ -414,7 +428,7 @@ class DK154:
 
         for ii in range(1, n_exp + 1):
             filename = f"{object_name}_{ii:03d}.fits"
-            self.take_science_exposure(
+            self.take_science_frame(
                 exposure_time, filename, object_name, read_wait=read_wait
             )
 
