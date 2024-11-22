@@ -336,6 +336,7 @@ class DK154:
         """
         Take a single science frame.
         First, Ascol.shop("1") [SHutter OPen/close] is called to ensure shutter is open.
+        Call WaveLamps().all_lamps_off() to ensure arc lamps are off.
         Then, call CCD3 to save to <filename>
         Optionally wait <exposure_time>+1 seconds.
         Wait for <read_wait> seconds (for CCD3 to read out).
@@ -359,7 +360,8 @@ class DK154:
         exp_params["CCD3.IMAGETYP"] = "SCIENCE"
         exp_params["CCD3.OBJECT"] = object_name
 
-        # TODO: switch lamps off
+        with WaveLamps(test_mode=self.test_mode) as wvlamps:
+            wvlamps.all_lamps_off()
 
         with Ascol(test_mode=self.test_mode) as ascol:
             FASU_A = ascol.warp()
@@ -438,6 +440,7 @@ class DK154:
         """
         Take dark frames.
         First calls Ascol.shop("0") to ensure shutter is closed.
+        Call WaveLamps().all_lamps_off() to ensure arc lamps are off.
 
         files are named "<dark_name>_001.fits", "<dark_name>_002.fits",
         and are likely stored in lin1:/data/YYMMDD/
@@ -467,6 +470,9 @@ class DK154:
         exp_params["CCD3.exposure"] = str(exposure_time)
         exp_params["CCD3.IMAGETYP"] = "DARK"
         exp_params["CCD3.OBJECT"] = "DARK"
+
+        with WaveLamps(test_mode=self.test_mode) as wvlamps:
+            wvlamps.all_lamps_off()
 
         with Ascol(test_mode=self.test_mode) as ascol:
             ascol.shop("0")

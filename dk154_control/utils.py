@@ -16,10 +16,6 @@ class SilenceLoggers:
         logging.disable(logging.NOTSET)
 
 
-def get_output_directory():
-    # base_data_dir = os.environ.get("BASE_DATA_DIR", )
-
-
 def dec_dms_to_deg(dms):
     """
     Convert (signed) DMS 'float' into decimal degrees.
