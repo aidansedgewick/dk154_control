@@ -45,8 +45,9 @@ class WaveLamps:
     AVAILABLE_OUTLETS = (1, 2, 3, 4, 5, 6, 7, 8)
 
     ePDUOutletControlOutletCommand = "1.3.6.1.4.1.3808.1.1.3.3.3.1.1.4"
+    ePDUOutletStatusOutletState = "1.3.6.1.4.1.3808.1.1.3.3.5.1.1.4"
 
-    def __init__(self, test_mode=False, outlets=DEFAULT_OUTLETS):
+    def __init__(self, test_mode=False, wavelamp_outlets=DEFAULT_OUTLETS):
 
         logger.info("init wavelamp controller")
 
@@ -57,9 +58,9 @@ class WaveLamps:
             self.HOST = self.LOCAL_HOST
             self.PORT = self.LOCAL_PORT
 
-        if isinstance(outlets, int):
+        if isinstance(wavelamp_outlets, int):
             outlets = tuple(outlets)  # So can loop through them later...
-        self.outlets = outlets
+        self.wavelamp_outlets = wavelamp_outlets
 
     def __enter__(self):
         return self
@@ -95,13 +96,18 @@ class WaveLamps:
         )
         print(errorIndication, errorStatus, errorIndex, varBinds)
 
-    def get_outlet_state(self, outlet):
+    def get_outlet_state(self, outlet, return_all=False):
+        """
+        Returns state of requested outlet - "1" is on, "2" is off
+        
+        If return_all = True, return the entire response from pysnmp
+        """
 
         if outlet not in self.AVAILABLE_OUTLETS:
             msg = f"outlet not in available_outlets: {self.AVAILABLE_OUTLETS}"
             raise CyberPowerPduException(msg)
 
-        oid = ObjectIdentity(f"{self.ePDUOutletControlOutletCommand}.{outlet}")
+        oid = ObjectIdentity(f"{self.ePDUOutletStatusOutletState}.{outlet}")
 
         errorIndication, errorStatus, errorIndex, varBinds = asyncio.run(
             getCmd(
@@ -112,6 +118,11 @@ class WaveLamps:
                 ObjectType(oid),
             )
         )
+        if return_all:
+            return errorIndication, errorStatus, errorIndex, varBinds
+        state_result = varBinds[0] # we ask only ONE outlet: get first (and only) result
+        outlet_oid, outlet_state = state_result
+        return outlet_state.prettyPrint()
 
     def set_outlet_on(self, outlet):
         self.set_outlet(outlet, 1)  # immediateOn
@@ -120,21 +131,37 @@ class WaveLamps:
         self.set_outlet(outlet, 2)  # immediateOff
 
     def all_lamps_on(self):
-        for outlet in self.outlets:
+        for outlet in self.wavelamp_outlets:
             self.set_outlet(outlet, 1)  # immediateOn
 
     def all_lamps_off(self):
-        for outlet in self.outlets:
+        for outlet in self.wavelamp_outlets:
             self.set_outlet(outlet, 2)  # immediateOff
 
     def all_outlets_off(self):
         for outlet in self.AVAILABLE_OUTLETS:
             self.set_outlet(outlet, 2)  # immediateOff
+            
+    def get_all_lamps_state(self):
+        logger.info("collect lamp states")
+        result = {}
+        for outlet in self.wavelamp_outlets:
+            state = self.get_outlet_state(outlet)
+            result[outlet] = state
+        return result
+        
+    def get_all_outlets_state(self):
+        result = {}
+        for outlet in self.AVAILABLE_OUTLETS:
+            state = self.get_outlet_state(outlet)
+            result[outlet] = state
+        return result
+        
 
 
 if __name__ == "__main__":
 
-    import dk154_control
+    import dk154_control # for loggers
 
     wvlamps = WaveLamps(test_mode=True)
     wvlamps.all_lamps_off()

@@ -37,15 +37,15 @@ if __name__ == "__main__":
         # print("\n\n\n")
 
         input(f"test \033[32;1mset_exposeure_parameters\033[0m - press enter: ")
-        exp_time = 10.0  # sec
+        exp_time = 0.0  # sec
 
         # Hopefully there will be a nicer way to set parameters in the future...
         exp_parameters = {}
         exp_parameters["CCD3.exposure"] = exp_time  # exp_time [sec]
-        exp_parameters["CCD3.IMAGETYP"] = "LIGHT"
+        exp_parameters["CCD3.IMAGETYP"] = "BIAS"
         exp_parameters["CCD3.OBJECT"] = "test_obs"  # What are you observing?
         exp_parameters["WASA.filter"] = "0"
-        exp_parameters["WASB.filter"] = "2"  # Filter position is 'B' ?
+        exp_parameters["WASB.filter"] = "2"  # Filter position is 'B'?
 
         ccd3.set_exposure_parameters(params=exp_parameters)
 
@@ -53,7 +53,7 @@ if __name__ == "__main__":
         logger.info(f"ccd state after set parameters: {ccd_state}")
         print("\n\n\n")
 
-        N_exp = 5
+        N_exp = 20
 
         for ii in range(N_exp):
             if ii > 0:
@@ -64,14 +64,18 @@ if __name__ == "__main__":
             input(
                 f"test \033[32;1mstart exposure exp no. {ii}/{N_exp}\033[0m - press enter: "
             )
-            filename = f"test_exp_{ii:03d}.fits"  # eg. test_exp_000, test_exp_001, etc.
+            filename = f"ucph/bias_test_{ii:03d}.fits"  # eg. test_exp_000, test_exp_001, etc.
             logger.info(f"file name {filename}")
             ccd3.start_exposure(filename)
 
             logger.info(f"wait {exp_time} + 5 sec for exposure/read to finish")
-            time.sleep(exp_time + 5.0)  # wait!
+                
+            for ii in range(int(exp_time+20.0)):
+                ccd_state = ccd3.get_ccd_state()
+                logger.info(f"after {ii} sec, ccd state={ccd_state}")
+                time.sleep(1.0)
+            
             # Now check the directory where you expect the file to have been saved.
-            logger.info(f"Now check lin1::/data/<date>/{filename} ?")
 
             ccd_state = ccd3.get_ccd_state()
             logger.info(f"CCD state after exposure: {ccd_state}")

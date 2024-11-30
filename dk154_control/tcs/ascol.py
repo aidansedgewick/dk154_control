@@ -677,7 +677,73 @@ class Ascol:
         """
         result_code, *dummy_values = self.get_data("WBRS")
         return ascol_constants.WBRS_CODES[result_code]
+        
+    def fosa(self, focus_position: float):
+        """
+        FOcus Set Absolute position [ASCOL 2.75]
+        
+        Returns:
+            result (str): "1" (ok) or ERR        
+        """
+        if isinstance(focus_position, str):
+            focus_str = focus_position
+        else:
+            focus_str = f"{focus_position:.2f}"
+        
+        cmd = f"FOSA {focus_str}"
+        result_code, *dummy_values = self.get_data(cmd)
+        return result_code
+        
+    def fosr(self, focus_position: float):
+        """
+        FOcus Set Relative position [ASCOL 2.75]
+        
+        Returns:
+            result (str): "1" (ok) or ERR        
+        """
+        if isinstance(focus_position, str):
+            focus_str = focus_position
+        else:
+            focus_str = f"{focus_position:.+2f}"
+        
+        cmd = f"FOSR {focus_str}"
+        result_code, *dummy_values = self.get_data(cmd)
+        return result_code
 
+    def foga(self):
+        """
+        FOcus Go Absolute position [ASCOL 2.78]
+        
+        Reutrns:
+            result (str): "1" (ok) or ERR
+        """
+        self.gllg()
+        
+        result_code, *dummy_values = self.get_data("FOGA")
+        return result_code
+        
+    def fogr(self):
+        """
+        FOcus Go Relative position [ASCOL 2.78]
+        
+        Reutrns:
+            result (str): "1" (ok) or ERR
+        self.gllg()
+        """
+        self.gllg()
+        result_code, *dummy_values = self.get_data("FOGR")
+        return result_code
+
+    def fost(self):
+        """
+        FOcus STop [ASCOL 2.81]
+              
+        Reutrns:
+            result (str): "1" (ok) or ERR
+        """
+        result_code, *dummy_values = self.get_data("FOST")
+        return result_code
+        
     def fora(self):
         """
         FOcus Read Absolute position [ASCOL 2.82]

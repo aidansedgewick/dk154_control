@@ -1,5 +1,5 @@
 import logging
-
+from datetime import datetime, timedelta
 import os
 
 import numpy as np
@@ -15,6 +15,15 @@ class SilenceLoggers:
     def __exit__(self, exit_type, exit_value, exit_traceback):
         logging.disable(logging.NOTSET)
 
+
+def get_directory_datestr():
+    dt = timedelta(hours=12)
+    time = datetime.now() - dt
+    return time.strftime("%Y%m%d")
+    
+def get_hm_str():
+    time = datetime.now()
+    return time.strftime("%H%M")
 
 def dec_dms_to_deg(dms):
     """

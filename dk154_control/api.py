@@ -18,7 +18,7 @@ FASU_A_POS_LOOKUP = {v: k for k, v in ascol_constants.WARP_CODES.items()}
 FASU_B_POS_LOOKUP = {v: k for k, v in ascol_constants.WBRP_CODES.items()}
 
 DFOSC_GRISM_LOOKUP = dfosc_setup["grism"]
-DFOSC_SLIT_LOOKUP = dfosc_setup["slit"]
+DFOSC_APERTURE_LOOKUP = dfosc_setup["aperture"]
 DFOSC_FILTER_LOOKUP = dfosc_setup["filter"]
 
 
@@ -277,34 +277,40 @@ class DK154:
 
         with Dfosc(test_mode=self.test_mode) as dfosc:
             dfosc.grism_goto(dfosc_g_pos)
+            dfosc.g()
+            time.sleep(0.5)
+            dfosc.gp()
         return
 
-    def move_dfosc_slit_and_wait(self, dfosc_slit: str):
+    def move_dfosc_aperture_and_wait(self, dfosc_aperture: str):
         """
         Move DFOSC slit/aperture wheel to the requested grism.
         Waits for the DFOSC alit wheel to move to the correct location.
 
         Args:
-            dfosc_slit : str
-                The slit name (eg. '1.0')
+            dfosc_aperture : str
+                The aperture name (eg. '1.0')
 
         """
-        dfosc_s_pos = DFOSC_SLIT_LOOKUP.get(dfosc_slit, None)
+        dfosc_s_pos = DFOSC_APERTURE_LOOKUP.get(dfosc_aperture, None)
 
         if dfosc_s_pos is None:
             msg = (
-                f"unknown DFOSC SLIT '{dfosc_slit}'\n"
-                f"    known: {DFOSC_SLIT_LOOKUP.keys()}"
+                f"unknown DFOSC APERTURE '{dfosc_aperture}'\n"
+                f"    known: {DFOSC_APERTURE_LOOKUP.keys()}"
             )
             raise KeyError(msg)
 
         with Dfosc(test_mode=self.test_mode) as dfosc:
             dfosc.aperture_goto(dfosc_s_pos)
+            dfosc.a()
+            time.sleep(0.5)
+            dfosc.ap()
         return
 
     def move_dfosc_filter_and_wait(self, dfosc_filter: str):
         """
-        Move DFOSC slit/aperture wheel to the requested grism.
+        Move DFOSC filter wheel to the requested grism.
         Waits for the DFOSC alit wheel to move to the correct location.
 
         Args:
@@ -323,6 +329,9 @@ class DK154:
 
         with Dfosc(test_mode=self.test_mode) as dfosc:
             dfosc.filter_goto(dfosc_f_pos)
+            dfosc.f()
+            time.sleep(0.5)
+            dfosc.fp()
         return
 
     def take_science_frame(

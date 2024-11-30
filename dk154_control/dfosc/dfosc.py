@@ -15,6 +15,8 @@ import yaml
 from logging import getLogger
 from pathlib import Path
 
+import numpy as np
+
 from dk154_control.utils import SilenceLoggers
 
 logger = getLogger(__name__.split(".")[-1])
@@ -32,8 +34,37 @@ def load_dfosc_setup(setup_path=None):
         return yaml.load(f, Loader=yaml.FullLoader)
 
 
-def guess_wheel_pos(current_pos, wheel_setup: dict):
-    raise NotImplementedError()
+def guess_wheel_element_name(current_pos, wheel_setup: dict, wheel_max=320000):
+
+    # Hopefully the position exactly matches
+    inv_setup = {int(v): str(k) for k, v in wheel_setup.items()}
+    name = inv_setup.get(current_pos, None)
+    if name is not None:
+        logger.info(f"exact match '{name}' for {current_pos}")
+        return name
+        
+    # If not, get the closest defined position to the current position... 
+    logger.info(f"no exact match for {current_pos} - find closest.")
+    
+    wheel_positions = []
+    wheel_elem_names = []
+    for elem_name, wheel_pos  in wheel_setup.items():
+        wheel_positions.append(int(wheel_pos))
+        wheel_elem_names.append(elem_name)
+    
+    # Take care of 'wrap around' - eg. if positions are [0, ..., 240, 300], then
+    # have list [0,...240, 300, 360] so that 359 'rounds to' 360, not 300.
+    wheel_positions.append(wheel_positions[0] + wheel_max)
+    wheel_elem_names.append(wheel_elem_names[0]) 
+    
+    idx = np.argmin(abs(np.array(wheel_positions)-current_pos))    
+    #diff_list = [abs(x-current_pos) for x in wheel_positions]
+    #idx = min(range(len(diff_list)), key=lambda x: diff_list[x])
+    name = wheel_elem_names[idx]
+    closest_pos = wheel_setup[name]
+    logger.info(f"closest match '{name}' at postion {closest_pos}")
+    
+    return 
 
 
 class DfoscError(Exception):
@@ -78,7 +109,7 @@ class Dfosc:
         try:
             self.dfosc_setup = load_dfosc_setup()
         except Exception as e:
-            self.dfosc_setup = {"grism": {}, "slit": {}, "filter": {}}
+            self.dfosc_setup = {"grism": {}, "aper": {}, "filter": {}}
 
         self.tn = None
         self.sock = None
@@ -121,7 +152,7 @@ class Dfosc:
         """
         command_code = command.split()[0]
         print_command = command
-        logger.info(f"send: {print_command}")
+        #logger.info(f"send: {print_command}")
 
         send_command = (command + "\n").encode()
 
@@ -136,7 +167,7 @@ class Dfosc:
             # self.connect_socket()
             # self.sock.sendall(send_command)
             if self.debug:
-                logger.info("successful send after reconnect.")
+                logger.debug("successful send after reconnect.")
 
         TERMINATE_BYTES = "\n".encode("utf-8")  # telnet should return chars until THIS.
         data = self.tn.read_until(TERMINATE_BYTES)
@@ -145,7 +176,7 @@ class Dfosc:
         data = data.rstrip()
         data = data.split()
 
-        logger.info(f"receive {data}")
+        logger.info(f"decode + receive {data}")
 
         if len(data) == 1 and data[0] == "ERR":
             logger.warning(f"Result is ERR. Is {command_code} a 'set' command?")
@@ -495,7 +526,7 @@ class Dfosc:
         #         grism_pos, self.dfosc_setup["grism"]
         #     )
         #     aper_guess, aper_value = guess_wheel_pos(
-        #         grism_pos, self.dfosc_setup["slit"]
+        #         grism_pos, self.dfosc_setup["aperture"]
         #     )
         #     filter_guess, filter_value = guess_wheel_pos(
         #         grism_pos, self.dfosc_setup["filter"]
@@ -509,9 +540,9 @@ class Dfosc:
             f"    grism wheel ready? {grism_ready}\n"
             f"    aper wheel ready? {aper_ready}\n"
             f"    filter wheel ready? {filter_ready}\n"
-            f"    grism pos: {grism_pos}\n"  # (likely '{grism_guess}')\n"
-            f"    aper pos: {aper_pos}\n"  # (likely '{aper_guess}')\n"
-            f"    filter pos: {filter_pos}\n"  # (likely '{filter_guess}')\n"
+            f"    grism pos: {grism_pos} (likely '{grism_guess}')\n"
+            f"    aper pos: {aper_pos} (likely '{aper_guess}')\n"
+            f"    filter pos: {filter_pos}   (likely '{filter_guess}')\n"
         )
 
         logger.info(status_str)
@@ -530,30 +561,52 @@ class DfoscStatus:
         try:
             self.dfosc_setup = load_dfosc_setup()
         except Exception as e:
-            self.dfosc_setup = {"grism": {}, "slit": {}, "filter": {}}
+            self.dfosc_setup = {"grism": {}, "aperture": {}, "filter": {}}
 
+        try:
+            self.gather_status(test_mode=test_mode)
+        except Exception as e:
+            logger.info(f"when gathering DFOSC status:\n    {type(e).__name__}: {e}")
+            self.grism_ready = "???"
+            self.grism_position = "???"
+            self.aper_ready = "???"
+            self.aper_position = "???"
+            self.filter_ready = "???"
+            self.filter_position = "???"
+
+        try:
+            gpos = int(self.grism_position[2:]) # "GP40000" -> 0 [integer]
+            grism_guess = guess_wheel_element_name(gpos, self.dfosc_setup["grism"])
+            apos = int(self.aper_position[2:])
+            aper_guess = guess_wheel_element_name(apos, self.dfosc_setup["aperture"])
+            fpos = int(self.filter_position[2:])
+            filter_guess = guess_wheel_element_name(fpos, self.dfosc_setup["filter"])
+        except Exception as e:
+            print(e)
+            grism_guess, aper_guess, filter_guess = "ERR", "ERR", "ERR"
+
+        self.grism_name_guess = grism_guess
+        self.aper_name_guess = aper_guess
+        self.filter_name_guess = filter_guess
+        
+    def gather_status(self, test_mode=False):
         with Dfosc(test_mode=test_mode) as dfosc:
             self.grism_ready = dfosc.g()
-            self.grism_position = dfosc.gp()
+            self.grism_position = dfosc.gp() # returns eg. "GP40000"
             self.aper_ready = dfosc.a()
             self.aper_position = dfosc.ap()
             self.filter_ready = dfosc.f()
             self.filter_position = dfosc.fp()
-
-        # try:
-        #     grism_guess, grism_value = guess_wheel_pos(
-        #         self.grism_position, self.dfosc_setup["grism"]
-        #     )
-        #     aper_guess, aper_value = guess_wheel_pos(
-        #         self.aper_position, self.dfosc_setup["slit"]
-        #     )
-        #     filter_guess, filter_value = guess_wheel_pos(
-        #         self.filter_position, self.dfosc_setup["filter"]
-        #     )
-        # except Exception as e:
-        #     print(e)
-        #     grism_guess, aper_guess, filter_guess = "ERR", "ERR", "ERR"
-
-        self.grism_name_guess = "???"  # grism_guess
-        self.aper_name_guess = "???"  # aper_guess
-        self.filter_name_guess = "??? "  # filter_guess
+            
+    def log_all_status(self):
+        status_str = (
+            f"DFOSC status:\n"
+            f"    grism wheel ready? {self.grism_ready}\n"
+            f"    aper wheel ready? {self.aper_ready}\n"
+            f"    filter wheel ready? {self.filter_ready}\n"
+            f"    grism pos: {self.grism_position} ('{self.grism_name_guess}')\n"
+            f"    aper pos: {self.aper_position} ('{self.aper_name_guess}')\n"
+            f"    filter pos: {self.filter_position} ('{self.filter_name_guess}')\n"
+        )
+        logger.info(status_str)
+        
