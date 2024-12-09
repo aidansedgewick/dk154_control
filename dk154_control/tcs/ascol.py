@@ -71,7 +71,7 @@ class Ascol:
         self,
         test_mode: bool = False,
         debug: bool = False,
-        delay: float = 0.1,
+        delay: float = 0.01,
         external: bool = False,
     ):
 
@@ -104,7 +104,7 @@ class Ascol:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((self.HOST, self.PORT))
         self.conn_timestamp = time.time()
-        time.sleep(0.5)
+        time.sleep(0.1)
 
         self.sock = sock  # Don't name it 'socket' else overload module...
 
@@ -213,8 +213,9 @@ class Ascol:
         res_str = "/".join(expected_result)
         logger.info(f"{func_name} wait for result: '{res_str}'")
 
-        t_start = time.time()
-        while time.time() - t_start < timeout:
+        t_start = time.perf_counter()
+        while time.perf_counter() - t_start < timeout:
+            print("after sleep ")
             result = func()
             if result in expected_result:
                 logger.info(f"{func_name} returned '{result}': exit")
@@ -259,8 +260,10 @@ class Ascol:
             password_result (str): 0 (wrong pwd) or 1 (correct)
         """
         password = password or self._GLOBAL_PASSWORD
+        print(f"in gllg")
 
         command = f"GLLG {password}"
+        logger.info("sending gllg")
         result_code, *dummy_values = self.get_data(command)
         password_result = ascol_constants.GLLG_CODES[result_code]
         return password_result
@@ -396,6 +399,7 @@ class Ascol:
         Returns:
             result (str): "1" (ok) or ERR
         """
+        print(" in tgra")
         self.gllg()  # Set commands require global password
         result_code, *dummy_values = self.get_data("TGRA")
         return result_code
@@ -506,6 +510,18 @@ class Ascol:
         self.gllg()
         result_code, *dummy_values = self.get_data("DOST")
         return result_code
+
+    def dora(self):
+        """
+        DOme Read Absolute Position
+
+        Dome position is between 0.0 - 259.99
+
+        Returns:
+            dome_pos (float): dome position [deg]
+        """
+        dome_position, *dummy_values = self.get_data("DORA")
+        return float(dome_position)
 
     def dors(self):
         """
@@ -677,35 +693,35 @@ class Ascol:
         """
         result_code, *dummy_values = self.get_data("WBRS")
         return ascol_constants.WBRS_CODES[result_code]
-        
+
     def fosa(self, focus_position: float):
         """
         FOcus Set Absolute position [ASCOL 2.75]
-        
+
         Returns:
-            result (str): "1" (ok) or ERR        
+            result (str): "1" (ok) or ERR
         """
         if isinstance(focus_position, str):
             focus_str = focus_position
         else:
             focus_str = f"{focus_position:.2f}"
-        
+
         cmd = f"FOSA {focus_str}"
         result_code, *dummy_values = self.get_data(cmd)
         return result_code
-        
+
     def fosr(self, focus_position: float):
         """
         FOcus Set Relative position [ASCOL 2.75]
-        
+
         Returns:
-            result (str): "1" (ok) or ERR        
+            result (str): "1" (ok) or ERR
         """
         if isinstance(focus_position, str):
             focus_str = focus_position
         else:
             focus_str = f"{focus_position:.+2f}"
-        
+
         cmd = f"FOSR {focus_str}"
         result_code, *dummy_values = self.get_data(cmd)
         return result_code
@@ -713,19 +729,19 @@ class Ascol:
     def foga(self):
         """
         FOcus Go Absolute position [ASCOL 2.78]
-        
+
         Reutrns:
             result (str): "1" (ok) or ERR
         """
         self.gllg()
-        
+
         result_code, *dummy_values = self.get_data("FOGA")
         return result_code
-        
+
     def fogr(self):
         """
         FOcus Go Relative position [ASCOL 2.78]
-        
+
         Reutrns:
             result (str): "1" (ok) or ERR
         self.gllg()
@@ -737,13 +753,13 @@ class Ascol:
     def fost(self):
         """
         FOcus STop [ASCOL 2.81]
-              
+
         Reutrns:
             result (str): "1" (ok) or ERR
         """
         result_code, *dummy_values = self.get_data("FOST")
         return result_code
-        
+
     def fora(self):
         """
         FOcus Read Absolute position [ASCOL 2.82]
@@ -1110,6 +1126,7 @@ class AscolStatus:
             self.safety_relay_state = ascol.glsr()
             self.telescope_state = ascol.ters()
             self.dome_state = ascol.dors()
+            self.dome_position = ascol.dora()
             self.dome_slit_state = ascol.doss()
             self.flap_cassegrain_state = ascol.fcrs()
             self.flap_mirror_state = ascol.fmrs()
@@ -1130,6 +1147,7 @@ class AscolStatus:
             f"    safety relay [GLSR]: {self.safety_relay_state}\n"
             f"    tel. state [TERS]  : {self.telescope_state}\n"
             f"    dome state [DORS]  : {self.dome_state}\n"
+            f"    dome pos [DOPO]    : {self.dome_position}\n"
             f"    domeslit st. [DOSS]: {self.dome_slit_state}\n"
             f"    casseg. flap [FCRS]: {self.flap_cassegrain_state}\n"
             f"    mirror flap [FMRS] : {self.flap_mirror_state}\n"

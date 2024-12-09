@@ -7,6 +7,8 @@ Controls for the aperture/slits, filter, and grism wheels for DFOSC.
 Basic commands defined, and some additional start-up read-state commands for the various wheels.
 """
 
+import traceback
+
 import time
 
 import socket
@@ -36,35 +38,40 @@ def load_dfosc_setup(setup_path=None):
 
 def guess_wheel_element_name(current_pos, wheel_setup: dict, wheel_max=320000):
 
+    try:
+        int(current_pos)
+    except:
+        return "ERR"
+
     # Hopefully the position exactly matches
     inv_setup = {int(v): str(k) for k, v in wheel_setup.items()}
     name = inv_setup.get(current_pos, None)
     if name is not None:
         logger.info(f"exact match '{name}' for {current_pos}")
         return name
-        
-    # If not, get the closest defined position to the current position... 
+
+    # If not, get the closest defined position to the current position...
     logger.info(f"no exact match for {current_pos} - find closest.")
-    
+
     wheel_positions = []
     wheel_elem_names = []
-    for elem_name, wheel_pos  in wheel_setup.items():
+    for elem_name, wheel_pos in wheel_setup.items():
         wheel_positions.append(int(wheel_pos))
         wheel_elem_names.append(elem_name)
-    
+
     # Take care of 'wrap around' - eg. if positions are [0, ..., 240, 300], then
     # have list [0,...240, 300, 360] so that 359 'rounds to' 360, not 300.
     wheel_positions.append(wheel_positions[0] + wheel_max)
-    wheel_elem_names.append(wheel_elem_names[0]) 
-    
-    idx = np.argmin(abs(np.array(wheel_positions)-current_pos))    
-    #diff_list = [abs(x-current_pos) for x in wheel_positions]
-    #idx = min(range(len(diff_list)), key=lambda x: diff_list[x])
+    wheel_elem_names.append(wheel_elem_names[0])
+
+    idx = np.argmin(abs(np.array(wheel_positions) - current_pos))
+    # diff_list = [abs(x-current_pos) for x in wheel_positions]
+    # idx = min(range(len(diff_list)), key=lambda x: diff_list[x])
     name = wheel_elem_names[idx]
     closest_pos = wheel_setup[name]
     logger.info(f"closest match '{name}' at postion {closest_pos}")
-    
-    return 
+
+    return f"{name} [at {closest_pos}]"
 
 
 class DfoscError(Exception):
@@ -152,7 +159,7 @@ class Dfosc:
         """
         command_code = command.split()[0]
         print_command = command
-        #logger.info(f"send: {print_command}")
+        # logger.info(f"send: {print_command}")
 
         send_command = (command + "\n").encode()
 
@@ -176,7 +183,7 @@ class Dfosc:
         data = data.rstrip()
         data = data.split()
 
-        logger.info(f"decode + receive {data}")
+        logger.info(f"receive + decode {data}")
 
         if len(data) == 1 and data[0] == "ERR":
             logger.warning(f"Result is ERR. Is {command_code} a 'set' command?")
@@ -348,7 +355,7 @@ class Dfosc:
 
     def a(self):
         """
-        Check driver ready. Returns 'y' if ready, 'n' if not ready.
+        Check driver ready. Returns 'ay' if ready, 'n' if not ready.
         """
         command = f"a"
         result_code, *dummy_values = self.get_data(command)
@@ -458,7 +465,7 @@ class Dfosc:
 
     def f(self):
         """
-        Check driver ready. Returns 'y' if ready, 'n' if not ready.
+        Check driver ready. Returns 'fy' if ready, 'n' if not ready.
         """
         command = f"f"
         result_code, *dummy_values = self.get_data(command)
@@ -513,39 +520,39 @@ class Dfosc:
         self.filter_wait()
         return result
 
-    def log_all_status(self):
-        grism_ready = self.g()
-        grism_pos = self.gp()
-        aper_ready = self.a()
-        aper_pos = self.ap()
-        filter_ready = self.f()
-        filter_pos = self.fp()
+    # def log_all_status(self):
+    #     grism_ready = self.g()
+    #     grism_pos = self.gp()
+    #     aper_ready = self.a()
+    #     aper_pos = self.ap()
+    #     filter_ready = self.f()
+    #     filter_pos = self.fp()
 
-        # try:
-        #     grism_guess, grism_value = guess_wheel_pos(
-        #         grism_pos, self.dfosc_setup["grism"]
-        #     )
-        #     aper_guess, aper_value = guess_wheel_pos(
-        #         grism_pos, self.dfosc_setup["aperture"]
-        #     )
-        #     filter_guess, filter_value = guess_wheel_pos(
-        #         grism_pos, self.dfosc_setup["filter"]
-        #     )
-        # except Exception as e:
-        #     print(e)
-        #     grism_guess, aper_guess, filter_guess = "?ERR", "?ERR", "?ERR"
+    #     try:
+    #         grism_guess, grism_value = guess_wheel_pos(
+    #             grism_pos, self.dfosc_setup["grism"]
+    #         )
+    #         aper_guess, aper_value = guess_wheel_pos(
+    #             grism_pos, self.dfosc_setup["aperture"]
+    #         )
+    #         filter_guess, filter_value = guess_wheel_pos(
+    #             grism_pos, self.dfosc_setup["filter"]
+    #         )
+    #     except Exception as e:
+    #         print(e)
+    #         grism_guess, aper_guess, filter_guess = "?ERR", "?ERR", "?ERR"
 
-        status_str = (
-            f"DFOSC status:\n"
-            f"    grism wheel ready? {grism_ready}\n"
-            f"    aper wheel ready? {aper_ready}\n"
-            f"    filter wheel ready? {filter_ready}\n"
-            f"    grism pos: {grism_pos} (likely '{grism_guess}')\n"
-            f"    aper pos: {aper_pos} (likely '{aper_guess}')\n"
-            f"    filter pos: {filter_pos}   (likely '{filter_guess}')\n"
-        )
+    #     status_str = (
+    #         f"DFOSC status:\n"
+    #         f"    grism wheel ready? {grism_ready}\n"
+    #         f"    aper wheel ready? {aper_ready}\n"
+    #         f"    filter wheel ready? {filter_ready}\n"
+    #         f"    grism pos: {grism_pos} (likely '{grism_guess}')\n"
+    #         f"    aper pos: {aper_pos} (likely '{aper_guess}')\n"
+    #         f"    filter pos: {filter_pos}   (likely '{filter_guess}')\n"
+    #     )
 
-        logger.info(status_str)
+    #     logger.info(status_str)
 
 
 class DfoscStatus:
@@ -575,29 +582,43 @@ class DfoscStatus:
             self.filter_position = "???"
 
         try:
-            gpos = int(self.grism_position[2:]) # "GP40000" -> 0 [integer]
+            gpos = int(self.grism_position[2:])  # "GP40000" -> 0 [integer]
             grism_guess = guess_wheel_element_name(gpos, self.dfosc_setup["grism"])
+        except Exception as e:
+            grism_guess = "ERR"
+
+        try:
             apos = int(self.aper_position[2:])
             aper_guess = guess_wheel_element_name(apos, self.dfosc_setup["aperture"])
+        except Exception as e:
+            aper_guess = "ERR"
+
+        try:
             fpos = int(self.filter_position[2:])
             filter_guess = guess_wheel_element_name(fpos, self.dfosc_setup["filter"])
         except Exception as e:
-            print(e)
-            grism_guess, aper_guess, filter_guess = "ERR", "ERR", "ERR"
+            filter_guess = "ERR"
 
         self.grism_name_guess = grism_guess
         self.aper_name_guess = aper_guess
         self.filter_name_guess = filter_guess
-        
+
     def gather_status(self, test_mode=False):
+
+        self.grism_position = "GP--N/A--"  #
+        self.aper_position = "AP--N/A--"
+        self.filter_position = "FP--N/A--"
         with Dfosc(test_mode=test_mode) as dfosc:
             self.grism_ready = dfosc.g()
-            self.grism_position = dfosc.gp() # returns eg. "GP40000"
+            if self.grism_ready == "gy":
+                self.grism_position = dfosc.gp()  # returns eg. "GP40000"
             self.aper_ready = dfosc.a()
-            self.aper_position = dfosc.ap()
+            if self.aper_ready == "ay":
+                self.aper_position = dfosc.ap()
             self.filter_ready = dfosc.f()
-            self.filter_position = dfosc.fp()
-            
+            if self.filter_ready == "fy":
+                self.filter_position = dfosc.fp()
+
     def log_all_status(self):
         status_str = (
             f"DFOSC status:\n"
@@ -609,4 +630,3 @@ class DfoscStatus:
             f"    filter pos: {self.filter_position} ('{self.filter_name_guess}')\n"
         )
         logger.info(status_str)
-        

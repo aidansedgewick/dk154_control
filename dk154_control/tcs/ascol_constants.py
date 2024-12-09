@@ -69,7 +69,7 @@ TERS_CODES = {
     "07": "sky slew",
     "08": "mechanical flip",
     "09": "sky flip",
-    "10": "parking",  # typo in docs? one should be parked?
+    "10": "parking",  # typo in docs? 10 or 11 should be "PARKED"?
     "11": "parking",
     "12": "initializing",
 }
@@ -97,7 +97,7 @@ DORS_CODES = {
 # this command is not defined in the ASCOL document
 DOSS_CODES = {
     "00": "stopped",
-    "01": "openning",
+    "01": "opening",
     "02": "closing",
     "03": "open",
     "04": "closed",

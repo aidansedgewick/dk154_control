@@ -26,36 +26,41 @@ EXPECTED_PARAMETERS = (
     "WASB.filter",
 )
 
-def take_discard_frames(remote_dir: str, hm_str=None, n_exp=2, discard_exposure=1.0):
-    
-    hm_str = hm_str or get_hm_str()    
-    
+
+def take_discard_frames(
+    remote_dir: str, hm_str=None, n_exp=2, discard_exposure=1.0, test_mode=False
+):
+
+    hm_str = hm_str or get_hm_str()
+
     discard_params = {"CCD3.exposure": discard_exposure, "CCD3.SHUTTER": "1"}
-    
+
     logger.info(f"take {n_exp} discard frames")
-    
+
     for ii in range(n_exp):
-        
+
         t_start = time.perf_counter()
-        with Ccd3() as ccd3:
+        with Ccd3(test_mode=test_mode) as ccd3:
             state = ccd3.get_ccd_state()
             logger.info(f"before set discard params, ccd state {state}")
-    
+
             logger.info(f"set discard params {discard_params}")
             ccd3.set_exposure_parameters(discard_params)
-            
+
             discard_filename = f"discard_{hm_str}_{ii:03d}.fits"
             remote_filepath = f"{remote_dir}/{discard_filename}"
-            
+
             ccd3.start_exposure(remote_filepath)
-            
+
             ccd3.wait_for_exposure(exp_time=discard_exposure)
-            
+
             try:
                 backup_and_add_header_keys(f"/data/{remote_filepath}")
             except Exception as e:
-                logger.error(f"in backup {remote_filepath}:\n    {type(e).__name__} {e}")
-            
+                logger.error(
+                    f"in backup {remote_filepath}:\n    {type(e).__name__} {e}"
+                )
+
     return
 
 
@@ -138,8 +143,8 @@ class Ccd3:
         self.current_exposure_parameters = params
 
         response = self.get_data(mset_url, params=params)
-        #state = response["state"]
-        #logger.info(f"after set params, state={state}")      
+        # state = response["state"]
+        # logger.info(f"after set params, state={state}")
 
         if self.debug:
             # TODO: Remove next two lines?
@@ -170,9 +175,9 @@ class Ccd3:
 
         response = self.get_data(expose_url, params=params)
         state = response["state"]
-        logger.info(f"after start exp: state={state}")        
-        
-        self.exposure_parameters = None # so that we warn if parameters are not reset
+        logger.info(f"after start exp: state={state}")
+
+        self.exposure_parameters = None  # so that we warn if parameters are not reset
         return response
 
     def stop_exposure(self) -> requests.Response:
@@ -194,24 +199,24 @@ class Ccd3:
             logger.info(f"CCD3 state: {ccd_state}")
 
         return ccd_state
-        
+
     def wait_for_exposure(
-        self, exp_time: float=None, read_time=45.0, log_interval=20.0, log_state=True
+        self, exp_time: float = None, read_time=45.0, log_interval=20.0, log_state=True
     ):
-    
+
         time.sleep(1.0)
         t_start = time.perf_counter()
-        
+
         if exp_time is None:
             response = self.get_ccd_response()
-            exp_time = response["d"]["exposure"][1] 
+            exp_time = response["d"]["exposure"][1]
             logger.info("read exposure time as {exp_time}s")
             # 'exposure' is a list [<code>, <exp_time>, 0, 0, <comment>]
-        
+
         logger.info(f"wait {exp_time:.1f}+{read_time:.1f}sec for exposure")
-        
+
         wait_time = exp_time + read_time
-        
+
         dt = time.perf_counter() - t_start
         while dt < wait_time:
             time.sleep(log_interval)
@@ -219,14 +224,7 @@ class Ccd3:
             if log_state:
                 state = self.get_ccd_state()
                 logger.info(f"after {dt:.1f}s, ccd state is {state}")
-            
-        logger.info(f"exit after wait {dt:.1f}s")
-        
-        return 
-                
-        
 
-    
-    
-    
-    
+        logger.info(f"exit after wait {dt:.1f}s")
+
+        return

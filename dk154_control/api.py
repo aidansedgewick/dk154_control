@@ -237,6 +237,7 @@ class DK154:
 
         with Ascol(test_mode=self.test_mode) as ascol:
             wheel_b_curr = ascol.wbrp()
+            logger.info(f"FASU B current/target: {wheel_b_curr}/{wheel_b_filter}")
             wheel_b_state = ascol.wbrs()
             if wheel_b_filter == wheel_b_curr:
                 logger.info(f"FASU B already at {wheel_b_filter} - done!")
@@ -244,7 +245,7 @@ class DK154:
 
             wasp_result = ascol.wbsp(wheel_b_pos)
             wagp_result = ascol.wbgp()
-
+            logger.info(f"waiting for result {wait_for_state}...")
             ascol.wait_for_result(ascol.wbrs, expected_result=wait_for_state)
         return
 
@@ -255,7 +256,7 @@ class DK154:
 
         Args:
             dfosc_grism : str
-                The grism number (eg. '2')
+                The grism number (eg. 'G2')
 
 
 
@@ -276,9 +277,15 @@ class DK154:
             raise KeyError(msg)
 
         with Dfosc(test_mode=self.test_mode) as dfosc:
+            grism_curr_str = dfosc.gp()  # returns eg. "GP40000"
+            grism_curr = int(grism_curr_str[2:])
+            logger.info(f"DFOSC G current/target: {grism_curr}/{dfosc_g_pos}")
+            if dfosc_g_pos == grism_curr:
+                logger.info(f"grism already at {dfosc_g_pos} - done!")
+                return
             dfosc.grism_goto(dfosc_g_pos)
             dfosc.g()
-            time.sleep(0.5)
+            time.sleep(0.1)
             dfosc.gp()
         return
 
@@ -292,9 +299,9 @@ class DK154:
                 The aperture name (eg. '1.0')
 
         """
-        dfosc_s_pos = DFOSC_APERTURE_LOOKUP.get(dfosc_aperture, None)
+        dfosc_a_pos = DFOSC_APERTURE_LOOKUP.get(dfosc_aperture, None)
 
-        if dfosc_s_pos is None:
+        if dfosc_a_pos is None:
             msg = (
                 f"unknown DFOSC APERTURE '{dfosc_aperture}'\n"
                 f"    known: {DFOSC_APERTURE_LOOKUP.keys()}"
@@ -302,9 +309,15 @@ class DK154:
             raise KeyError(msg)
 
         with Dfosc(test_mode=self.test_mode) as dfosc:
-            dfosc.aperture_goto(dfosc_s_pos)
+            aper_curr_str = dfosc.ap()  # returns eg. "AP40000"
+            aper_curr = int(aper_curr_str[2:])
+            logger.info(f"DFOSC A current/target: {aper_curr}/{dfosc_a_pos}")
+            if dfosc_a_pos == aper_curr:
+                logger.info(f"aper already at {dfosc_a_pos} - done!")
+                return
+            dfosc.aperture_goto(dfosc_a_pos)
             dfosc.a()
-            time.sleep(0.5)
+            time.sleep(0.1)
             dfosc.ap()
         return
 
@@ -328,9 +341,16 @@ class DK154:
             raise KeyError(msg)
 
         with Dfosc(test_mode=self.test_mode) as dfosc:
+            filter_curr_str = dfosc.fp()  # returns eg. "FP40000"
+            filter_curr = int(filter_curr_str[2:])
+            logger.info(f"DFOSC A current/target: {filter_curr}/{dfosc_f_pos}")
+            if dfosc_f_pos == filter_curr:
+                logger.info(f"dfosc filter already at {dfosc_f_pos} - done!")
+                return
+
             dfosc.filter_goto(dfosc_f_pos)
             dfosc.f()
-            time.sleep(0.5)
+            time.sleep(0.1)
             dfosc.fp()
         return
 
