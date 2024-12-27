@@ -28,40 +28,82 @@ EXPECTED_PARAMETERS = (
 
 
 def take_discard_frames(
-    remote_dir: str, hm_str=None, n_exp=2, discard_exposure=1.0, test_mode=False
+    remote_dir: str,
+    n_exp=2,
+    exp_time=1.0,
+    test_mode=False,
+    exit_event=None,
+):
+    logger.info(f"take {n_exp} discard frames")
+
+    take_multi_exposure(
+        remote_dir=remote_dir,
+        exp_time=exp_time,
+        n_exp=n_exp,
+        object_name="discard",
+        shutter="1",  # CLOSED!
+        imgtype="DARK",
+        mod_imgtype="DISCARD",
+        test_mode=test_mode,
+        exit_event=exit_event,
+    )
+
+
+def take_multi_exposure(
+    remote_dir: str,
+    exp_time: float,
+    n_exp: int,
+    object_name: str,  # NOT 'object', as a reserved keyword.
+    filestem=None,
+    shutter="0",
+    imagetyp="LIGHT",
+    params=None,
+    hm_str=None,
+    mod_imagetyp=None,
+    test_mode=False,
+    exit_event=None,
 ):
 
     hm_str = hm_str or get_hm_str()
 
-    discard_params = {"CCD3.exposure": discard_exposure, "CCD3.SHUTTER": "1"}
+    exp_params = {
+        "CCD3.exposure": exp_time,
+        "CCD3.IMAGETYP": imagetyp,
+        "CCD3.SHUTTER": shutter,
+        "CCD3.OBJECT": object_name,
+    }
+    if params is None:
+        exp_params.update(params)
 
-    logger.info(f"take {n_exp} discard frames")
+    filestem = filestem or object_name
 
-    for ii in range(n_exp):
+    with Ccd3(test_mode=test_mode) as ccd3:
 
-        t_start = time.perf_counter()
-        with Ccd3(test_mode=test_mode) as ccd3:
+        for ii in range(n_exp):
             state = ccd3.get_ccd_state()
-            logger.info(f"before set discard params, ccd state {state}")
+            logger.info(f"before set exp_params, ccd state {state}")
 
-            logger.info(f"set discard params {discard_params}")
-            ccd3.set_exposure_parameters(discard_params)
+            logger.info(f"set discard params {exp_params}")
+            ccd3.set_exposure_parameters(exp_params)
 
-            discard_filename = f"discard_{hm_str}_{ii:03d}.fits"
+            discard_filename = f"{filestem}_{hm_str}_{ii:03d}.fits"
             remote_filepath = f"{remote_dir}/{discard_filename}"
 
             ccd3.start_exposure(remote_filepath)
 
-            ccd3.wait_for_exposure(exp_time=discard_exposure)
+            ccd3.wait_for_exposure(exp_time=exp_time, exit_event=exit_event)
 
+            if exit_event is not None:
+                if exit_event.is_set():
+                    return
             try:
-                backup_and_add_header_keys(f"/data/{remote_filepath}")
+                backup_and_add_header_keys(
+                    f"/data/{remote_filepath}", imagetyp=mod_imagetyp
+                )
             except Exception as e:
                 logger.error(
                     f"in backup {remote_filepath}:\n    {type(e).__name__} {e}"
                 )
-
-    return
 
 
 class Ccd3:
@@ -201,7 +243,12 @@ class Ccd3:
         return ccd_state
 
     def wait_for_exposure(
-        self, exp_time: float = None, read_time=45.0, log_interval=20.0, log_state=True
+        self,
+        exp_time: float = None,
+        read_time=45.0,
+        log_interval=20.0,
+        log_state=True,
+        exit_event: "threading.Event" = None,
     ):
 
         time.sleep(1.0)
@@ -218,12 +265,21 @@ class Ccd3:
         wait_time = exp_time + read_time
 
         dt = time.perf_counter() - t_start
+        last_log = time.perf_counter()
         while dt < wait_time:
-            time.sleep(log_interval)
+            time.sleep(1.0)
             dt = time.perf_counter() - t_start
-            if log_state:
+
+            # Do we log the state?
+            logging_dt = time.perf_counter() - last_log
+            if log_state and logging_dt > log_interval:
                 state = self.get_ccd_state()
                 logger.info(f"after {dt:.1f}s, ccd state is {state}")
+                last_log = time.perf_counter()
+
+            if exit_event is not None:
+                if exit_event.is_set():
+                    return
 
         logger.info(f"exit after wait {dt:.1f}s")
 

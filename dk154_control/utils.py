@@ -5,6 +5,7 @@ import os
 import numpy as np
 
 from astropy.coordinates import Angle
+from astropy.time import Time
 
 
 class SilenceLoggers:
@@ -25,6 +26,13 @@ def get_directory_datestr():
 def get_hm_str():
     time = datetime.now()
     return time.strftime("%H%M")
+
+
+def time_from_mjdstr_hhmmss(mjd: str, hhmmss: str) -> Time:
+
+    mjd_str = Time(int(mjd), format="mjd").strftime("%Y%m%d")
+    obstime = Time.strptime(f"{mjd_str} {hhmmss}", "%Y%m%d %H%M%S.%f")
+    return obstime
 
 
 def dec_dms_to_deg(dms):

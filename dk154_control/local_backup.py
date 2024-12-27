@@ -70,7 +70,7 @@ def backup_and_add_header_keys(
     remote_config=None,
     remote_base_dir="/data/ucph/",
     local_base_dir="/home/dk154/data/",
-    img_type=None,
+    imagetyp=None,
     **header_keys,
 ):
     """
@@ -176,10 +176,10 @@ def backup_and_add_header_keys(
             comment = f"Hg lamp state (PDU outlet={outlet_number} 1=on 2=off)"
             f[0].header[header_key] = (lamp_status, comment)
 
-        if img_type is not None:
+        if imagetyp is not None:
             curr_type = f[0].header["IMAGETYP"]
             comment = f"Updated from {curr_type} during copy"
-            f[0].header["IMAGETYP"] = (img_type.upper(), comment)
+            f[0].header["IMAGETYP"] = (imagetyp.upper(), comment)
 
         for k, v in header_keys.items():
             f[0].header[k] = v
